@@ -67,10 +67,6 @@ return function(meta)
   end
 
   local function loop()
-    if should_quit then
-      return
-    end
-
     local events, err = term:poll(10)
     if err then
       dispatch { id = 'log:push', data = err }
@@ -80,6 +76,8 @@ return function(meta)
       if e.type == 'key' then
         if e.code == 'f12' and e.kind == 'press' then
           display_log = not display_log
+        elseif e.ctrl and e.code == 'c' and e.kind == 'press' then
+          dispatch { id = 'quit' }
         end
         dispatch { id = 'key', data = e }
       elseif e.type == 'mouse' then
@@ -130,4 +128,6 @@ return function(meta)
       dispatch { id = 'log:push', data = err }
     end
   until should_quit
+
+  deinit_term()
 end

@@ -6,18 +6,13 @@ App {
   end,
 
   update = function(model, msg)
-    if msg.id == 'key' then
-      if msg.data.code == 'q' or (msg.data.code == 'c' and msg.data.ctrl) then
-        return model, { id = 'quit' }
-      elseif msg.data.code == 'enter' and msg.data.kind == 'press' then
-        model = model + 1
-      end
+    if msg.id == 'key' and msg.data.code == 'enter' and msg.data.kind == 'press' then
+      model = model + 1
     end
-    return model, nil
+    return model
   end,
 
-
   view = function(model, buf)
-    buf.write('Count: ' .. model)
+    buf.write('Count: ' .. tostring(model))
   end
 }
