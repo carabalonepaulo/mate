@@ -3,18 +3,42 @@ local UnboundedQueue = require 'queue.unbounded'
 local term = require 'term'
 local Buffer = require 'buffer'
 
-return function(meta)
+local function init_term()
   term:enable_raw_mode()
   term:enter_alt_screen()
   term:enable_bracketed_paste()
   term:hide_cursor()
   term:move_cursor(0, 0)
   term:flush()
+end
+
+local function deinit_term()
+  term:disable_raw_mode()
+  term:leave_alt_screen()
+  term:disable_bracketed_paste()
+  term:show_cursor()
+  term:flush()
+end
+
+local function safe_init(fn, ...)
+  local ok, model, cmd = pcall(fn, ...)
+  if not ok then
+    deinit_term()
+    term:println(model)
+    term:println(debug.traceback())
+    os.exit(false)
+  else
+    return model, cmd
+  end
+end
+
+return function(meta)
+  init_term()
 
   local msgs = UnboundedQueue()
   local should_quit = false
   local should_redraw = true
-  local model, init_cmd = meta.init()
+  local model, init_cmd = safe_init(meta.init)
 
   local w, h = term:get_size()
   local front_buffer = Buffer(w, h)

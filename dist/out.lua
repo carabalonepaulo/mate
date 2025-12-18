@@ -553,24 +553,91 @@ return function()
 end
 
 end)()
+package.loaded["mate.components.log"] = (function()
+local CircularBuffer = require 'mate.queue.circular'
+
+return {
+  init = function()
+    return CircularBuffer(16)
+  end,
+
+  update = function(model, msg)
+    if msg.id == 'log:push' then
+      model.push(msg.data)
+    end
+    return model, nil
+  end,
+
+  view = function(model, buf)
+    buf.move_to_next_line()
+
+    for line in model.items() do
+      buf.move_to_col(2)
+
+      local location, num, err = string.match(line, '^(.*:)(%d+): (.*)$')
+      if location and num and err then
+        buf.set_attr('dim')
+        buf.write(location)
+        buf.reset_style()
+        buf.set_fg('#b37e49')
+        buf.write(num)
+        buf.reset_style()
+        buf.set_attr('dim')
+        buf.write(': ')
+        buf.reset_style()
+        buf.write(err)
+        buf.move_to_next_line()
+      else
+        buf.write(line)
+        buf.move_to_next_line()
+      end
+    end
+  end,
+}
+
+end)()
 package.loaded["mate.app"] = (function()
 local UnboundedQueue = require 'mate.queue.unbounded'
 
 local term = require 'term'
 local Buffer = require 'mate.buffer'
 
-return function(meta)
+local function init_term()
   term:enable_raw_mode()
   term:enter_alt_screen()
   term:enable_bracketed_paste()
   term:hide_cursor()
   term:move_cursor(0, 0)
   term:flush()
+end
+
+local function deinit_term()
+  term:disable_raw_mode()
+  term:leave_alt_screen()
+  term:disable_bracketed_paste()
+  term:show_cursor()
+  term:flush()
+end
+
+local function safe_init(fn, ...)
+  local ok, model, cmd = pcall(fn, ...)
+  if not ok then
+    deinit_term()
+    term:println(model)
+    term:println(debug.traceback())
+    os.exit(false)
+  else
+    return model, cmd
+  end
+end
+
+return function(meta)
+  init_term()
 
   local msgs = UnboundedQueue()
   local should_quit = false
   local should_redraw = true
-  local model, init_cmd = meta.init()
+  local model, init_cmd = safe_init(meta.init)
 
   local w, h = term:get_size()
   local front_buffer = Buffer(w, h)
@@ -722,49 +789,6 @@ return {
 
   view = function(model, buf)
     buf.write(STYLES[model.style][model.idx])
-  end,
-}
-
-end)()
-package.loaded["mate.components.log"] = (function()
-local CircularBuffer = require 'mate.queue.circular'
-
-return {
-  init = function()
-    return CircularBuffer(16)
-  end,
-
-  update = function(model, msg)
-    if msg.id == 'log:push' then
-      model.push(msg.data)
-    end
-    return model, nil
-  end,
-
-  view = function(model, buf)
-    buf.move_to_next_line()
-
-    for line in model.items() do
-      buf.move_to_col(2)
-
-      local location, num, err = string.match(line, '^(.*:)(%d+): (.*)$')
-      if location and num and err then
-        buf.set_attr('dim')
-        buf.write(location)
-        buf.reset_style()
-        buf.set_fg('#b37e49')
-        buf.write(num)
-        buf.reset_style()
-        buf.set_attr('dim')
-        buf.write(': ')
-        buf.reset_style()
-        buf.write(err)
-        buf.move_to_next_line()
-      else
-        buf.write(line)
-        buf.move_to_next_line()
-      end
-    end
   end,
 }
 
