@@ -75,6 +75,11 @@ return {
       end
     end
 
+    if id == 'paste' then
+      model.text = model.text .. msg.data
+      return model
+    end
+
     if not (msg.data and msg.data.uid == model.uid) then
       return model
     end

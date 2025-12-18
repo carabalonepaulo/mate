@@ -34,7 +34,7 @@ App {
       model.size = { msg.data.width, msg.data.height }
     end
 
-    if msg.data.code == 'c' and msg.data.ctrl and not model.input.enabled then
+    if msg.data and msg.data.code == 'c' and msg.data.ctrl and not model.input.enabled then
       batch.push { id = 'quit' }
     end
 

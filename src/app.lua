@@ -21,13 +21,17 @@ local function deinit_term()
   term:flush()
 end
 
+local function exit_err(err)
+  deinit_term()
+  term:println(err)
+  term:println(debug.traceback())
+  os.exit(false)
+end
+
 local function safe_init(fn, ...)
   local ok, model, cmd = pcall(fn, ...)
   if not ok then
-    deinit_term()
-    term:println(model)
-    term:println(debug.traceback())
-    os.exit(false)
+    exit_err(model)
   else
     return model, cmd
   end
@@ -68,9 +72,7 @@ return function(meta)
 
   local function loop()
     local events, err = term:poll(10)
-    if err then
-      dispatch { id = 'log:push', data = err }
-    end
+    if err then exit_err(err) end
 
     for _, e in ipairs(events) do
       if e.type == 'key' then
@@ -124,9 +126,7 @@ return function(meta)
 
   repeat
     local ok, err = pcall(loop)
-    if not ok then
-      dispatch { id = 'log:push', data = err }
-    end
+    if not ok then exit_err(err) end
   until should_quit
 
   deinit_term()

@@ -219,4 +219,9 @@ function term:poll(ms) end
 --- @return TermEvent[], string?
 function term:read() end
 
+--- @param back Buffer
+--- @param front Buffer
+--- @return string?
+function term:render_diff(back, front) end
+
 return term
