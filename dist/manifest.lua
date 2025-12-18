@@ -3,6 +3,7 @@ return {
     ["require 'queue.circular'"] = "require 'mate.queue.circular'",
     ["require 'queue.unbounded'"] = "require 'mate.queue.unbounded'",
     ["require 'uid'"] = "require 'mate.uid'",
+    ["require 'batch'"] = "require 'mate.batch'",
     ["require 'components.log'"] = "require 'mate.components.log'",
   },
   files = {
@@ -13,6 +14,7 @@ return {
     { 'mate.uid',                   './src/uid.lua' },
     { 'mate.components.log',        './src/components/log.lua' },
     { 'mate.app',                   './src/app.lua' },
+    { 'mate.components.timer',      './src/components/timer.lua' },
     { 'mate.components.spinner',    './src/components/spinner.lua' },
     { 'mate.components.line_input', './src/components/line_input.lua' },
   }
