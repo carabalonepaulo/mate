@@ -52,16 +52,16 @@ App {
       model.input_style
           .center(unpack(model.size))
           .draw(buf, function(x, y, w, h)
-            buf.move_to(x, y)
-            buf.write(' > ')
+            buf:move_to(x, y)
+            buf:write(' > ')
             LineInput.view(model.input, buf)
           end)
     else
-      buf.move_to(2, 2)
-      buf.write('Text: ')
-      buf.set_attr('italic')
-      buf.write(model.text)
-      buf.set_attr()
+      buf:move_to(2, 2)
+      buf:write('Text: ')
+      buf:set_attr('italic')
+      buf:write(model.text)
+      buf:set_attr(nil)
     end
   end
 }

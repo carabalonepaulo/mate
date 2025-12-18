@@ -99,11 +99,11 @@ return {
 
   view = function(model, buf)
     if model.text == '' then
-      buf.set_attr('dim')
-      buf.write(model.placeholder)
-      buf.set_attr()
+      buf:set_attr('dim')
+      buf:write(model.placeholder)
+      buf:set_attr(nil)
     else
-      buf.write(model.text)
+      buf:write(model.text)
     end
   end
 }

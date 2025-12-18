@@ -100,9 +100,7 @@ return function()
   self.get_dims = function() return self_x, self_y, self_w, self_h end
 
   self.draw = function(buf, content_fn)
-    local old_fg = buf.get_fg()
-    local old_bg = buf.get_bg()
-    local old_attr = buf.get_attr()
+    buf:push_style()
 
     local bx = self_x + ml
     local by = self_y + mt
@@ -111,29 +109,29 @@ return function()
 
     if bw <= 0 or bh <= 0 then return self end
 
-    if sfg then buf.set_fg(sfg) end
-    if sbg then buf.set_bg(sbg) end
-    if sattr and sattr ~= '' then buf.set_attr(sattr) end
+    if sfg then buf:set_fg(sfg) end
+    if sbg then buf:set_bg(sbg) end
+    if sattr then buf:set_attr(sattr) end
 
     if sbg then
       for row = 0, bh - 1 do
-        buf.move_to(bx, by + row)
-        buf.write(string.rep(" ", bw))
+        buf:move_to(bx, by + row)
+        buf:write(string.rep(" ", bw))
       end
     end
 
     local b_offset = 0
     if border_enabled then
       b_offset = 1
-      buf.move_to(bx, by)
-      buf.write(border_tl .. string.rep(border_char_h, bw - 2) .. border_tr)
+      buf:move_to(bx, by)
+      buf:write(border_tl .. string.rep(border_char_h, bw - 2) .. border_tr)
 
-      buf.move_to(bx, by + bh - 1)
-      buf.write(border_bl .. string.rep(border_char_h, bw - 2) .. border_br)
+      buf:move_to(bx, by + bh - 1)
+      buf:write(border_bl .. string.rep(border_char_h, bw - 2) .. border_br)
 
       for i = 1, bh - 2 do
-        buf.move_to(bx, by + i); buf.write(border_char_v)
-        buf.move_to(bx + bw - 1, by + i); buf.write(border_char_v)
+        buf:move_to(bx, by + i); buf:write(border_char_v)
+        buf:move_to(bx + bw - 1, by + i); buf:write(border_char_v)
       end
     end
 
@@ -144,16 +142,15 @@ return function()
 
     if content_fn and iw > 0 and ih > 0 then
       local cx, cy, cw, ch = 0, 0, 0, 0
-      cx, cy, cw, ch = buf.get_clip()
-      buf.set_clip(ix, iy, iw, ih)
+      cx, cy, cw, ch = buf:get_clip()
+      buf:set_clip(ix, iy, iw, ih)
 
       content_fn(ix, iy, iw, ih)
 
-      buf.set_clip(cx, cy, cw, ch)
+      buf:set_clip(cx, cy, cw, ch)
     end
 
-    buf.set_style(old_fg, old_bg, old_attr)
-
+    buf:pop_style()
     return self
   end
 
@@ -170,8 +167,8 @@ return function()
     self_h = inner_h + mt + mb
 
     self.draw(buf, function(ix, iy, iw, ih)
-      buf.move_to(ix, iy)
-      buf.write(text)
+      buf:move_to(ix, iy)
+      buf:write(text)
     end)
 
     return self

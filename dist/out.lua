@@ -231,9 +231,7 @@ return function()
   self.get_dims = function() return self_x, self_y, self_w, self_h end
 
   self.draw = function(buf, content_fn)
-    local old_fg = buf.get_fg()
-    local old_bg = buf.get_bg()
-    local old_attr = buf.get_attr()
+    buf:push_style()
 
     local bx = self_x + ml
     local by = self_y + mt
@@ -242,29 +240,29 @@ return function()
 
     if bw <= 0 or bh <= 0 then return self end
 
-    if sfg then buf.set_fg(sfg) end
-    if sbg then buf.set_bg(sbg) end
-    if sattr and sattr ~= '' then buf.set_attr(sattr) end
+    if sfg then buf:set_fg(sfg) end
+    if sbg then buf:set_bg(sbg) end
+    if sattr then buf:set_attr(sattr) end
 
     if sbg then
       for row = 0, bh - 1 do
-        buf.move_to(bx, by + row)
-        buf.write(string.rep(" ", bw))
+        buf:move_to(bx, by + row)
+        buf:write(string.rep(" ", bw))
       end
     end
 
     local b_offset = 0
     if border_enabled then
       b_offset = 1
-      buf.move_to(bx, by)
-      buf.write(border_tl .. string.rep(border_char_h, bw - 2) .. border_tr)
+      buf:move_to(bx, by)
+      buf:write(border_tl .. string.rep(border_char_h, bw - 2) .. border_tr)
 
-      buf.move_to(bx, by + bh - 1)
-      buf.write(border_bl .. string.rep(border_char_h, bw - 2) .. border_br)
+      buf:move_to(bx, by + bh - 1)
+      buf:write(border_bl .. string.rep(border_char_h, bw - 2) .. border_br)
 
       for i = 1, bh - 2 do
-        buf.move_to(bx, by + i); buf.write(border_char_v)
-        buf.move_to(bx + bw - 1, by + i); buf.write(border_char_v)
+        buf:move_to(bx, by + i); buf:write(border_char_v)
+        buf:move_to(bx + bw - 1, by + i); buf:write(border_char_v)
       end
     end
 
@@ -275,16 +273,15 @@ return function()
 
     if content_fn and iw > 0 and ih > 0 then
       local cx, cy, cw, ch = 0, 0, 0, 0
-      cx, cy, cw, ch = buf.get_clip()
-      buf.set_clip(ix, iy, iw, ih)
+      cx, cy, cw, ch = buf:get_clip()
+      buf:set_clip(ix, iy, iw, ih)
 
       content_fn(ix, iy, iw, ih)
 
-      buf.set_clip(cx, cy, cw, ch)
+      buf:set_clip(cx, cy, cw, ch)
     end
 
-    buf.set_style(old_fg, old_bg, old_attr)
-
+    buf:pop_style()
     return self
   end
 
@@ -301,8 +298,8 @@ return function()
     self_h = inner_h + mt + mb
 
     self.draw(buf, function(ix, iy, iw, ih)
-      buf.move_to(ix, iy)
-      buf.write(text)
+      buf:move_to(ix, iy)
+      buf:write(text)
     end)
 
     return self
@@ -331,123 +328,6 @@ return function(...)
 end
 
 end)()
-package.loaded["mate.buffer"] = (function()
-local term = require 'term'
-local Buffer = require 'term.buffer'
-
-return function(w, h)
-  local buf = Buffer.new(w, h)
-
-  local current_fg = nil
-  local current_bg = nil
-  local current_attr = nil
-
-  local function set_clip(x, y, cw, ch)
-    buf:set_clip(x, y, cw, ch)
-  end
-
-  local function get_clip()
-    return buf:get_clip()
-  end
-
-  local function move_to(nx, ny)
-    buf:move_to(nx, ny)
-  end
-
-  local function move_to_col(col)
-    buf:move_to_col(col)
-  end
-
-  local function move_to_next_line()
-    buf:move_to_next_line()
-  end
-
-  local function set_style(fg, bg, attr)
-    current_fg = fg
-    current_bg = bg
-    current_attr = attr
-
-    buf:set_fg(fg)
-    buf:set_bg(bg)
-    buf:set_attr(attr)
-  end
-
-  local function get_bg()
-    return current_bg
-  end
-
-  local function set_fg(fg)
-    current_fg = fg
-    buf:set_fg(fg)
-  end
-
-  local function get_fg()
-    return current_fg
-  end
-
-  local function set_bg(bg)
-    current_bg = bg
-    buf:set_bg(bg)
-  end
-
-  local function get_attr()
-    return current_attr
-  end
-
-  local function set_attr(attr)
-    current_attr = attr
-    buf:set_attr(attr)
-  end
-
-  local function reset_style()
-    current_fg = nil
-    current_bg = nil
-    current_attr = nil
-    buf:reset_style()
-  end
-
-  local function write(text)
-    buf:write(text)
-  end
-
-  local function write_at(x, y, text)
-    buf:write_at(x, y, text)
-  end
-
-  local function clear()
-    buf:clear()
-  end
-
-  local function render_diff(other)
-    term:render_diff(buf, other.inner())
-  end
-
-  return {
-    inner = function() return buf end,
-    clear = clear,
-    write = write,
-    write_at = write_at,
-
-    set_clip = set_clip,
-    get_clip = get_clip,
-
-    set_style = set_style,
-    reset_style = reset_style,
-    get_fg = get_fg,
-    set_fg = set_fg,
-    get_bg = get_bg,
-    set_bg = set_bg,
-    get_attr = get_attr,
-    set_attr = set_attr,
-
-    move_to = move_to,
-    move_to_col = move_to_col,
-    move_to_next_line = move_to_next_line,
-    render_diff = render_diff,
-  }
-end
-
-end)()
 package.loaded["mate.uid"] = (function()
 local __uid = 0
 return function()
@@ -472,27 +352,27 @@ return {
   end,
 
   view = function(model, buf)
-    buf.move_to_next_line()
+    buf:move_to_next_line()
 
     for line in model.items() do
-      buf.move_to_col(2)
+      buf:move_to_col(2)
 
       local location, num, err = string.match(line, '^(.*:)(%d+): (.*)$')
       if location and num and err then
-        buf.set_attr('dim')
-        buf.write(location)
-        buf.reset_style()
-        buf.set_fg('#b37e49')
-        buf.write(num)
-        buf.reset_style()
-        buf.set_attr('dim')
-        buf.write(': ')
-        buf.reset_style()
-        buf.write(err)
-        buf.move_to_next_line()
+        buf:set_attr('dim')
+        buf:write(location)
+        buf:reset_style()
+        buf:set_fg('#b37e49')
+        buf:write(num)
+        buf:reset_style()
+        buf:set_attr('dim')
+        buf:write(': ')
+        buf:reset_style()
+        buf:write(err)
+        buf:move_to_next_line()
       else
-        buf.write(line)
-        buf.move_to_next_line()
+        buf:write(line)
+        buf:move_to_next_line()
       end
     end
   end,
@@ -503,7 +383,7 @@ package.loaded["mate.app"] = (function()
 local UnboundedQueue = require 'mate.queue.unbounded'
 
 local term           = require 'term'
-local Buffer         = require 'mate.buffer'
+local Buffer         = require 'term.buffer'
 local Log            = require 'mate.components.log'
 
 local function init_term()
@@ -548,8 +428,8 @@ return function(meta)
   local model, init_cmd = safe_init(meta.init)
 
   local w, h = term:get_size()
-  local front_buffer = Buffer(w, h)
-  local back_buffer = Buffer(w, h)
+  local front_buffer = Buffer.new(w, h)
+  local back_buffer = Buffer.new(w, h)
 
   local log_model, log_cmd = Log.init()
   local display_log = false
@@ -590,8 +470,8 @@ return function(meta)
         dispatch { id = 'paste', data = e.content }
       elseif e.type == 'resize' then
         w, h = e.width, e.height
-        front_buffer = Buffer(w, h)
-        back_buffer = Buffer(w, h)
+        back_buffer:resize(w, h)
+        front_buffer:resize(w, h)
         term:clear()
         dispatch { id = 'window_size', data = { width = w, height = h } }
         should_redraw = true
@@ -609,7 +489,7 @@ return function(meta)
     end
 
     if should_redraw then
-      back_buffer.clear()
+      back_buffer:clear()
 
       if display_log then
         Log.view(log_model, back_buffer)
@@ -617,7 +497,7 @@ return function(meta)
         meta.view(model, back_buffer)
       end
 
-      back_buffer.render_diff(front_buffer)
+      term:render_diff(back_buffer, front_buffer)
       should_redraw = false
     end
   end
@@ -710,7 +590,7 @@ return {
   end,
 
   view = function(model, buf)
-    buf.write(STYLES[model.style][model.idx])
+    buf:write(STYLES[model.style][model.idx])
   end,
 }
 
@@ -817,11 +697,11 @@ return {
 
   view = function(model, buf)
     if model.text == '' then
-      buf.set_attr('dim')
-      buf.write(model.placeholder)
-      buf.set_attr()
+      buf:set_attr('dim')
+      buf:write(model.placeholder)
+      buf:set_attr(nil)
     else
-      buf.write(model.text)
+      buf:write(model.text)
     end
   end
 }

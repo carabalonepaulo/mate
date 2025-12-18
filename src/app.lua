@@ -1,7 +1,7 @@
 local UnboundedQueue = require 'queue.unbounded'
 
 local term           = require 'term'
-local Buffer         = require 'buffer'
+local Buffer         = require 'term.buffer'
 local Log            = require 'components.log'
 
 local function init_term()
@@ -46,8 +46,8 @@ return function(meta)
   local model, init_cmd = safe_init(meta.init)
 
   local w, h = term:get_size()
-  local front_buffer = Buffer(w, h)
-  local back_buffer = Buffer(w, h)
+  local front_buffer = Buffer.new(w, h)
+  local back_buffer = Buffer.new(w, h)
 
   local log_model, log_cmd = Log.init()
   local display_log = false
@@ -88,8 +88,8 @@ return function(meta)
         dispatch { id = 'paste', data = e.content }
       elseif e.type == 'resize' then
         w, h = e.width, e.height
-        front_buffer = Buffer(w, h)
-        back_buffer = Buffer(w, h)
+        back_buffer:resize(w, h)
+        front_buffer:resize(w, h)
         term:clear()
         dispatch { id = 'window_size', data = { width = w, height = h } }
         should_redraw = true
@@ -107,7 +107,7 @@ return function(meta)
     end
 
     if should_redraw then
-      back_buffer.clear()
+      back_buffer:clear()
 
       if display_log then
         Log.view(log_model, back_buffer)
@@ -115,7 +115,7 @@ return function(meta)
         meta.view(model, back_buffer)
       end
 
-      back_buffer.render_diff(front_buffer)
+      term:render_diff(back_buffer, front_buffer)
       should_redraw = false
     end
   end

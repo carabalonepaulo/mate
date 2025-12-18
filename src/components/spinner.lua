@@ -72,6 +72,6 @@ return {
   end,
 
   view = function(model, buf)
-    buf.write(STYLES[model.style][model.idx])
+    buf:write(STYLES[model.style][model.idx])
   end,
 }

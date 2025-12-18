@@ -25,13 +25,13 @@ do
     end,
 
     view = function(model, buf)
-      buf.set_style(nil, nil, 'bold')
-      buf.write('Text: ')
-      buf.reset_style()
+      buf:set_attr('bold')
+      buf:write('Text: ')
+      buf:set_attr(nil)
 
-      buf.set_style('#60b2e0', nil, '')
-      buf.write(model.text)
-      buf.reset_style()
+      buf:set_fg('#60b2e0')
+      buf:write(model.text)
+      buf:set_fg(nil)
     end
   }
 end
@@ -66,12 +66,13 @@ App {
   end,
 
   view = function(model, buf)
-    buf.move_to_col(2)
-    buf.set_style('#758994', nil, 'italic')
-    buf.write('Press enter to display text...\n\n')
-    buf.reset_style()
+    buf:move_to_col(2)
+    buf:set_fg('#758994')
+    buf:set_attr('italic')
+    buf:write('Press enter to display text...\n\n')
+    buf:reset_style()
 
-    buf.move_to_col(2)
+    buf:move_to_col(2)
     Text.view(model.text, buf)
   end
 }

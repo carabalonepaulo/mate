@@ -13,6 +13,6 @@ App {
   end,
 
   view = function(model, buf)
-    buf.write('Count: ' .. tostring(model))
+    buf:write('Count: ' .. tostring(model))
   end
 }

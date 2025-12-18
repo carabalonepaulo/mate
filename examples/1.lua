@@ -4,31 +4,33 @@ local Batch = require 'mate.batch'
 local Spinner = require 'mate.components.spinner'
 
 local function select_scene(model, buf)
-  buf.move_to(2, 2)
-  buf.write(string.format('Size: %d/%d\n', model.size[1], model.size[2]))
+  buf:move_to(2, 2)
+  buf:write(string.format('Size: %d/%d\n', model.size[1], model.size[2]))
 
-  buf.move_to_col(2)
-  buf.write('Index: ')
-  buf.set_style('#e0ab48', nil, 'italic')
-  buf.write(tostring(model.idx))
-  buf.reset_style()
+  buf:move_to_col(2)
+  buf:write('Index: ')
+  buf:set_fg('#e0ab48')
+  buf:set_attr('italic')
+  buf:write(tostring(model.idx))
+  buf:reset_style()
 
-  buf.move_to_next_line()
-  buf.move_to_next_line()
+  buf:move_to_next_line()
+  buf:move_to_next_line()
 
   for idx, item in ipairs(model.items) do
     local prefix = model.idx == idx and 'X' or ' '
-    buf.move_to_col(2)
-    buf.write('[')
-    buf.set_style('#70de5d', nil, 'italic')
-    buf.write(prefix)
-    buf.reset_style()
-    buf.write('] ')
-    buf.set_style('#6f7fb0', nil, '')
-    buf.write(f('%d. ', idx))
-    buf.reset_style()
-    buf.write(item)
-    buf.write('\n')
+    buf:move_to_col(2)
+    buf:write('[')
+    buf:set_fg('#70de5d')
+    buf:set_attr('italic')
+    buf:write(prefix)
+    buf:reset_style()
+    buf:write('] ')
+    buf:set_fg('#6f7fb0')
+    buf:write(f('%d. ', idx))
+    buf:reset_style()
+    buf:write(item)
+    buf:write('\n')
   end
 
   local colors = {
@@ -53,26 +55,27 @@ local function select_scene(model, buf)
     '#8540e6',
   }
 
-  buf.move_to_next_line()
-  buf.move_to_col(2)
+  buf:move_to_next_line()
+  buf:move_to_col(2)
 
   for i, spinner in ipairs(model.spinners) do
-    buf.set_style(colors[i], nil, '')
+    buf:set_fg(colors[i])
     Spinner.view(spinner, buf)
-    buf.reset_style()
-    buf.write(' ')
+    buf:reset_style()
+    buf:write(' ')
   end
 
-  buf.move_to(2, model.size[2] - 1)
+  buf:move_to(2, model.size[2] - 1)
 end
 
 local function done_scene(model, buf)
-  buf.move_to(2, 2)
-  buf.write('Você escolheu ')
-  buf.set_style('#5d6cde', nil, 'italic under')
-  buf.write(model.items[model.idx])
-  buf.reset_style()
-  buf.write('!')
+  buf:move_to(2, 2)
+  buf:write('Você escolheu ')
+  buf:set_fg('#5d6cde')
+  buf:set_attr('italic under')
+  buf:write(model.items[model.idx])
+  buf:reset_style()
+  buf:write('!')
 end
 
 App {
