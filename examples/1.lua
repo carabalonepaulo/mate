@@ -1,9 +1,7 @@
 local f = string.format
 local App = require 'mate.app'
 local Batch = require 'mate.batch'
-local Log = require 'mate.components.log'
 local Spinner = require 'mate.components.spinner'
-local Fps = require 'mate.components.fps'
 
 local function select_scene(model, buf)
   buf.move_to(2, 2)
@@ -66,7 +64,6 @@ local function select_scene(model, buf)
   end
 
   buf.move_to(2, model.size[2] - 1)
-  Fps.view(model.fps, buf)
 end
 
 local function done_scene(model, buf)
@@ -85,18 +82,14 @@ App {
       table.insert(spinners, Spinner.init(0.001))
     end
 
-    local fps = Fps.init()
-
     local model = {
       should_quit = false,
       size = { 0, 0 },
       idx = 1,
       items = { 'First', 'Second', 'Third' },
       state = 'first',
-      log = Log.init(),
       prev_state = 'first',
       spinners = spinners,
-      fps = fps,
     }
 
     local batch = Batch()
@@ -105,8 +98,6 @@ App {
       batch.push(spinner.messages.style(i))
     end
 
-    batch.push(fps.start())
-
     return model, batch
   end,
 
@@ -114,16 +105,10 @@ App {
     local batch = Batch()
     local cmd
 
-    model.log, cmd = Log.update(model.log, msg)
-    batch.push(cmd)
-
     for idx, spinner in ipairs(model.spinners) do
       model.spinners[idx], cmd = Spinner.update(spinner, msg)
       batch.push(cmd)
     end
-
-    model.fps, cmd = Fps.update(model.fps, msg)
-    batch.push(cmd)
 
     local id = msg.id
     if id == 'quit' then
@@ -133,20 +118,11 @@ App {
     elseif id == 'window_size' then
       model.size = { msg.data.width, msg.data.height }
     elseif id == 'key' then
-      if (msg.data.code == 'x' and msg.data.ctrl) and msg.data.kind == 'press' then
-        if model.state == 'log' then
-          model.state = model.prev_state
-        else
-          model.prev_state = model.state
-          model.state = 'log'
-        end
-      end
       if msg.data.code == 'a' and msg.data.ctrl and msg.data.kind == 'press' then
         local fn = model.spinners[1].enabled and 'stop' or 'start'
         for _, spinner in ipairs(model.spinners) do
           batch.push(spinner.messages[fn])
         end
-        batch.push(model.fps[fn]())
       end
       if msg.data.kind == 'press' or msg.data.kind == 'repeat' then
         if msg.data.code == 'up' then
@@ -182,8 +158,6 @@ App {
       select_scene(model, buf)
     elseif model.state == 'second' then
       done_scene(model, buf)
-    elseif model.state == 'log' then
-      Log.view(model.log, buf)
     end
   end
 }

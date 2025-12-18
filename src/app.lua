@@ -1,7 +1,8 @@
 local UnboundedQueue = require 'queue.unbounded'
 
-local term = require 'term'
-local Buffer = require 'buffer'
+local term           = require 'term'
+local Buffer         = require 'buffer'
+local Log            = require 'components.log'
 
 local function init_term()
   term:enable_raw_mode()
@@ -44,8 +45,14 @@ return function(meta)
   local front_buffer = Buffer(w, h)
   local back_buffer = Buffer(w, h)
 
+  local log_model, log_cmd = Log.init()
+  local display_log = false
+
   local function dispatch(msg)
     if not msg then return end
+
+    log_model, log_cmd = Log.update(log_model, msg)
+    dispatch(log_cmd)
 
     if msg.id == 'batch' then
       for _, m in ipairs(msg.data) do
@@ -69,6 +76,9 @@ return function(meta)
 
     for _, e in ipairs(events) do
       if e.type == 'key' then
+        if e.code == 'f12' and e.kind == 'press' then
+          display_log = not display_log
+        end
         dispatch { id = 'key', data = e }
       elseif e.type == 'mouse' then
         dispatch { id = 'mouse', data = e }
@@ -96,13 +106,20 @@ return function(meta)
 
     if should_redraw then
       back_buffer.clear()
-      meta.view(model, back_buffer)
+
+      if display_log then
+        Log.view(log_model, back_buffer)
+      else
+        meta.view(model, back_buffer)
+      end
+
       back_buffer.render_diff(front_buffer)
       should_redraw = false
     end
   end
 
   dispatch(init_cmd)
+  dispatch(log_cmd)
   dispatch { id = 'window_size', data = { width = w, height = h } }
 
   repeat
