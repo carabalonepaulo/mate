@@ -82,6 +82,9 @@ return function(meta)
   dispatch { id = 'window_size', data = { width = w, height = h } }
 
   repeat
-    loop()
+    local ok, err = pcall(loop)
+    if not ok then
+      dispatch { id = 'log:push', data = err }
+    end
   until should_quit
 end

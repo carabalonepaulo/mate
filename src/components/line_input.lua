@@ -45,6 +45,7 @@ return {
     return {
       uid = id,
       text = '',
+      placeholder = '',
       enabled = false,
 
       enable = { id = 'line_input:enable', data = { uid = id } },
@@ -92,6 +93,12 @@ return {
   end,
 
   view = function(model, buf)
-    buf.write(model.text)
+    if model.text == '' then
+      buf.set_attr('dim')
+      buf.write(model.placeholder)
+      buf.set_attr()
+    else
+      buf.write(model.text)
+    end
   end
 }

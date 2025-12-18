@@ -638,7 +638,10 @@ return function(meta)
   dispatch { id = 'window_size', data = { width = w, height = h } }
 
   repeat
-    loop()
+    local ok, err = pcall(loop)
+    if not ok then
+      dispatch { id = 'log:push', data = err }
+    end
   until should_quit
 end
 
@@ -814,6 +817,7 @@ return {
     return {
       uid = id,
       text = '',
+      placeholder = '',
       enabled = false,
 
       enable = { id = 'line_input:enable', data = { uid = id } },
@@ -861,7 +865,13 @@ return {
   end,
 
   view = function(model, buf)
-    buf.write(model.text)
+    if model.text == '' then
+      buf.set_attr('dim')
+      buf.write(model.placeholder)
+      buf.set_attr()
+    else
+      buf.write(model.text)
+    end
   end
 }
 

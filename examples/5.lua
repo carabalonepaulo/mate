@@ -1,12 +1,24 @@
 local App = require 'mate.app'
 local LineInput = require 'mate.components.line_input'
 local Batch = require 'mate.batch'
+local Style = require 'mate.style'
 
 App {
   init = function()
+    local input = LineInput.init()
+    input.placeholder = 'type anything'
+
+    local input_style = Style()
+        .bg('#5773a1')
+        .border(true)
+        .width(50)
+        .height(3)
+
     local model = {
-      text = nil,
-      input = LineInput.init()
+      text = '',
+      input = input,
+      size = { 0, 0 },
+      input_style = input_style,
     }
     return model, model.input.enable
   end,
@@ -18,7 +30,11 @@ App {
     model.input, cmd = LineInput.update(model.input, msg)
     batch.push(cmd)
 
-    if msg.id == 'key' and (msg.data.code == 'q' or (msg.data.code == 'c' and msg.data.ctrl)) then
+    if msg.id == 'window_size' then
+      model.size = { msg.data.width, msg.data.height }
+    end
+
+    if msg.data.code == 'c' and msg.data.ctrl and not model.input.enabled then
       batch.push { id = 'quit' }
     end
 
@@ -32,11 +48,20 @@ App {
   end,
 
   view = function(model, buf)
-    buf.move_to(2, 2)
-    if model.text then
-      buf.write(model.text)
+    if model.text == '' then
+      model.input_style
+          .center(unpack(model.size))
+          .draw(buf, function(x, y, w, h)
+            buf.move_to(x, y)
+            buf.write(' > ')
+            LineInput.view(model.input, buf)
+          end)
     else
-      LineInput.view(model.input, buf)
+      buf.move_to(2, 2)
+      buf.write('Text: ')
+      buf.set_attr('italic')
+      buf.write(model.text)
+      buf.set_attr()
     end
   end
 }
