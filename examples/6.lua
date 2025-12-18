@@ -1,10 +1,12 @@
 local App = require 'mate.app'
 local Timer = require 'mate.components.timer'
+local fmt = string.format
 
 App {
   init = function()
-    local timer = Timer.init(1)
+    local timer = Timer.init(0.01)
     local model = {
+      elapsed = os.clock(),
       timer = timer,
       count = 0,
     }
@@ -22,6 +24,7 @@ App {
   end,
 
   view = function(model, buf)
-    buf:write('Count: ' .. tostring(model.count))
+    buf:write(fmt('Count: %0.2fs\n', model.count))
+    buf:write(fmt('Elapsed: %0.2fs', (os.clock() - model.elapsed)))
   end
 }

@@ -42,12 +42,14 @@ return function(meta)
 
   local msgs = UnboundedQueue()
   local should_quit = false
-  local should_redraw = true
   local model, init_cmd = safe_init(meta.init)
 
   local w, h = term:get_size()
   local front_buffer = Buffer.new(w, h)
   local back_buffer = Buffer.new(w, h)
+  local last_tick = os.clock()
+  local frame_time = 1 / 60
+  local last_render = 0
 
   local log_model, log_cmd = Log.init()
   local display_log = false
@@ -71,7 +73,7 @@ return function(meta)
   end
 
   local function loop()
-    local events, err = term:poll(10)
+    local events, err = term:poll(1)
     if err then exit_err(err) end
 
     for _, e in ipairs(events) do
@@ -92,13 +94,18 @@ return function(meta)
         front_buffer:resize(w, h)
         term:clear()
         dispatch { id = 'window_size', data = { width = w, height = h } }
-        should_redraw = true
       end
     end
 
     local msg
     local len = msgs.length()
-    should_redraw = len > 0
+
+    local now = os.clock()
+    local dt = now - last_tick
+    last_tick = now
+
+    model, msg = meta.update(model, { id = 'app:tick', data = { now = now, dt = dt } })
+    dispatch(msg)
 
     for i = 1, len do
       msg = msgs.dequeue()
@@ -106,17 +113,15 @@ return function(meta)
       dispatch(msg)
     end
 
-    if should_redraw then
+    if now - last_render >= frame_time then
       back_buffer:clear()
-
       if display_log then
         Log.view(log_model, back_buffer)
       else
         meta.view(model, back_buffer)
       end
-
       term:render_diff(back_buffer, front_buffer)
-      should_redraw = false
+      last_render = now
     end
   end
 
