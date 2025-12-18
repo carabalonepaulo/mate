@@ -72,7 +72,9 @@ return function(meta)
     end
 
     local events, err = term:poll(10)
-    if err then print(err) end
+    if err then
+      dispatch { id = 'log:push', data = err }
+    end
 
     for _, e in ipairs(events) do
       if e.type == 'key' then
