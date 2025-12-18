@@ -6,6 +6,7 @@ local Buffer = require 'buffer'
 return function(meta)
   term:enable_raw_mode()
   term:enter_alt_screen()
+  term:enable_bracketed_paste()
   term:hide_cursor()
   term:move_cursor(0, 0)
   term:flush()
@@ -45,6 +46,10 @@ return function(meta)
     for _, e in ipairs(events) do
       if e.type == 'key' then
         dispatch { id = 'key', data = e }
+      elseif e.type == 'mouse' then
+        dispatch { id = 'mouse', data = e }
+      elseif e.type == 'paste' then
+        dispatch { id = 'paste', data = e.content }
       elseif e.type == 'resize' then
         w, h = e.width, e.height
         front_buffer = Buffer(w, h)
@@ -73,17 +78,10 @@ return function(meta)
     end
   end
 
-  local function outer_loop()
-    local ok, err = pcall(loop)
-    if not ok then
-      msgs.enqueue({ id = 'log:push', data = err })
-    end
-  end
-
   dispatch(init_cmd)
   dispatch { id = 'window_size', data = { width = w, height = h } }
 
   repeat
-    outer_loop()
+    loop()
   until should_quit
 end

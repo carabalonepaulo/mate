@@ -1,8 +1,3 @@
-package.cpath = package.cpath .. ';' .. './bin/?.dll'
-
-require 'dist.out'
-
-local term = require 'term'
 local f = string.format
 local App = require 'mate.app'
 local Batch = require 'mate.batch'
