@@ -484,13 +484,18 @@ return function(meta)
         end
         data = nil
       else
-        if id == 'quit' then
-          should_quit = true
-        end
         msgs.enqueue(msg)
       end
 
       msg = disptach_stack.pop()
+    end
+  end
+
+  local function observe(msg)
+    log_model = Log.update(log_model, msg)
+
+    if msg.id == 'quit' then
+      should_quit = true
     end
   end
 
@@ -538,6 +543,7 @@ return function(meta)
 
     for i = 1, len do
       msg = msgs.dequeue()
+      observe(msg)
       model, msg = meta.update(model, msg)
       dispatch(msg)
     end
