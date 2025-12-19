@@ -1,5 +1,6 @@
 local Batch = require 'batch'
 local uid = require 'uid'
+local time = require 'term.time'
 
 return {
   init = function(interval)
@@ -19,7 +20,7 @@ return {
     local id = msg.id
 
     if id == 'timer:start' and msg.data == model.uid then
-      model.last_tick = os.clock()
+      model.last_tick = time.now()
       return model
     elseif id == 'timer:stop' and msg.data == model.uid then
       model.last_tick = -1

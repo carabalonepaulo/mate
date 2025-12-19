@@ -2,6 +2,8 @@ return {
   replace = {
     ["require 'ds.queue.circular'"] = "require 'mate.ds.queue.circular'",
     ["require 'ds.queue.unbounded'"] = "require 'mate.ds.queue.unbounded'",
+    ["require 'ds.queue.bounded'"] = "require 'mate.ds.queue.bounded'",
+    ["require 'input'"] = "require 'mate.input'",
     ["require 'uid'"] = "require 'mate.uid'",
     ["require 'batch'"] = "require 'mate.batch'",
     ["require 'ds.stack'"] = "require 'mate.ds.stack'",
@@ -11,6 +13,8 @@ return {
     { 'mate.ds.stack',              './src/ds/stack.lua' },
     { 'mate.ds.queue.circular',     './src/ds/queue/circular.lua' },
     { 'mate.ds.queue.unbounded',    './src/ds/queue/unbounded.lua' },
+    { 'mate.ds.queue.bounded',      './src/ds/queue/bounded.lua' },
+    { 'mate.input',                 './src/input.lua' },
     { 'mate.style',                 './src/style.lua' },
     { 'mate.batch',                 './src/batch.lua' },
     { 'mate.uid',                   './src/uid.lua' },

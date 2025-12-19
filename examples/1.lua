@@ -1,4 +1,5 @@
 local f = string.format
+local input = require 'mate.input'
 local App = require 'mate.app'
 local Batch = require 'mate.batch'
 local Spinner = require 'mate.components.spinner'
@@ -79,10 +80,12 @@ local function done_scene(model, buf)
 end
 
 App {
+  config = { fps = 30 },
+
   init = function()
     local spinners = {}
     for i = 1, 18 do
-      table.insert(spinners, Spinner.init(0.001))
+      table.insert(spinners, Spinner.init(0.1))
     end
 
     local model = {
@@ -120,36 +123,34 @@ App {
       model.log = msg.data
     elseif id == 'sys:ready' then
       model.size = { msg.data.width, msg.data.height }
-    elseif id == 'key' then
-      if msg.data.code == 'a' and msg.data.ctrl and msg.data.kind == 'press' then
-        local fn = model.spinners[1].enabled and 'stop' or 'start'
-        for _, spinner in ipairs(model.spinners) do
-          batch.push(spinner.messages[fn])
-        end
+    elseif input.pressed(msg, 'ctrl+a') then
+      local fn = model.spinners[1].enabled and 'stop' or 'start'
+      for _, spinner in ipairs(model.spinners) do
+        batch.push(spinner.messages[fn])
       end
-      if msg.data.kind == 'press' or msg.data.kind == 'repeat' then
-        if msg.data.code == 'up' then
-          model.idx = model.idx - 1
-          if model.idx < 1 then
-            model.idx = #model.items
-          end
-        elseif msg.data.code == 'down' then
-          model.idx = model.idx + 1
-          if model.idx > #model.items then
-            model.idx = 1
-          end
-        elseif msg.data.code == 'enter' then
-          model.state = 'second'
-        elseif msg.data.code == 'esc' then
-          if model.state == 'second' then
-            model.state = 'first'
-            model.idx = 1
-          else
-            return model, { id = 'quit' }
-          end
-        elseif msg.data.code >= '1' and msg.data.code <= tostring(#model.items) then
-          model.idx = tonumber(msg.data.code)
-        end
+    elseif input.hit(msg, 'up') then
+      model.idx = model.idx - 1
+      if model.idx < 1 then
+        model.idx = #model.items
+      end
+    elseif input.hit(msg, 'down') then
+      model.idx = model.idx + 1
+      if model.idx > #model.items then
+        model.idx = 1
+      end
+    elseif input.pressed(msg, 'enter') then
+      model.state = 'second'
+    elseif input.pressed(msg, 'esc') then
+      if model.state == 'second' then
+        model.state = 'first'
+        model.idx = 1
+      else
+        return model, { id = 'quit' }
+      end
+    else
+      local num = input.num(msg)
+      if num and num >= 1 and num <= #model.items then
+        model.idx = num
       end
     end
 

@@ -1,6 +1,7 @@
 local App = require 'mate.app'
 local Batch = require 'mate.batch'
 local uid = require 'mate.uid'
+local input = require 'mate.input'
 
 local Text
 do
@@ -46,15 +47,8 @@ App {
     model.text, cmd = Text.update(model.text, msg)
     batch.push(cmd)
 
-    if msg.id == 'key' and msg.data.kind == 'press' then
-      local code = msg.data.code
-      if code == 'q' or (code == 'c' and msg.data.ctrl) then
-        batch.push { id = 'quit' }
-      elseif code == 'enter' then
-        batch.push { id = 'text:set', data = { uid = model.text.uid, text = 'hello world' } }
-      elseif code == 'tab' and model.state ~= 'done' then
-        model.idx = model.idx < #model.items and model.idx + 1 or 1
-      end
+    if input.pressed(msg, 'enter') then
+      batch.push { id = 'text:set', data = { uid = model.text.uid, text = 'hello world' } }
     end
 
     return model, batch

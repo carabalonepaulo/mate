@@ -1,10 +1,18 @@
-local UnboundedQueue = require 'ds.queue.unbounded'
+local BoundedQueue   = require 'ds.queue.bounded'
 
+local input          = require 'input'
 local term           = require 'term'
 local time           = require 'term.time'
 local Buffer         = require 'term.buffer'
 local Log            = require 'components.log'
 local Stack          = require 'ds.stack'
+
+local DEFAULT_CONFIG = {
+  log_key = 'f12',
+  fps = 60,
+  max_msgs = 4096,
+  term_poll_timeout = 1,
+}
 
 local function init_term()
   term:enable_raw_mode()
@@ -23,34 +31,53 @@ local function deinit_term()
   term:flush()
 end
 
-local function exit_err(err)
+local function exit_with_err(err)
   deinit_term()
-  term:println(err)
+  term:println(tostring(err))
   term:println(debug.traceback())
   os.exit(false)
 end
 
-local function safe_init(fn, ...)
-  local ok, model, cmd = pcall(fn, ...)
-  if not ok then
-    exit_err(model)
-  else
-    return model, cmd
+local function load_confg(meta_config)
+  local config = {}
+
+  for k, v in pairs(DEFAULT_CONFIG) do
+    config[k] = v
   end
+
+  if meta_config then
+    local err_msg = 'invalid config value for "%s": expected %s, got %s'
+    for k, v in pairs(meta_config) do
+      if DEFAULT_CONFIG[k] == nil then
+        error(string.format('unknown config key "%s"', k), 2)
+      end
+
+      local nty = type(v)
+      local oty = type(DEFAULT_CONFIG[k])
+      if nty ~= oty then
+        error(string.format(err_msg, k, oty, nty), 2)
+      end
+
+      config[k] = v
+    end
+  end
+
+  return config
 end
 
-return function(meta)
+local function run(meta)
   init_term()
 
-  local msgs = UnboundedQueue()
+  local config = load_confg(meta.config)
+  local msgs = BoundedQueue(config.max_msgs)
   local should_quit = false
-  local model, init_cmd = safe_init(meta.init)
+  local model, init_cmd = meta.init()
 
   local w, h = term:get_size()
   local front_buffer = Buffer.new(w, h)
   local back_buffer = Buffer.new(w, h)
   local last_tick = time.now()
-  local frame_time = 1 / 60
+  local frame_time = 1 / config.fps
   local last_render = 0
 
   local tick_msg_data = { now = 0, dt = 0, budget = 0 }
@@ -58,14 +85,14 @@ return function(meta)
 
   local log_model, log_cmd = Log.init()
   local display_log = false
-  local disptach_stack = Stack()
+  local dispatch_stack = Stack()
 
   local function dispatch(initial)
     if not initial then return end
-    disptach_stack.push(initial)
+    dispatch_stack.push(initial)
 
     local id, data
-    local msg = disptach_stack.pop()
+    local msg = dispatch_stack.pop()
 
     while msg do
       id = msg.id
@@ -73,14 +100,16 @@ return function(meta)
       if id == 'batch' then
         data = msg.data
         for i = #data, 1, -1 do
-          disptach_stack.push(data[i])
+          dispatch_stack.push(data[i])
         end
         data = nil
       else
-        msgs.enqueue(msg)
+        if not msgs.enqueue(msg) then
+          error('msg queue overflow')
+        end
       end
 
-      msg = disptach_stack.pop()
+      msg = dispatch_stack.pop()
     end
   end
 
@@ -95,16 +124,20 @@ return function(meta)
   local function loop()
     local frame_start = time.now()
 
-    local events, err = term:poll(1)
-    if err then exit_err(err) end
+    local events, err = term:poll(config.term_poll_timeout)
+    if err then exit_with_err(err) end
 
     for _, e in ipairs(events) do
       if e.type == 'key' then
-        if e.code == 'f12' and e.kind == 'press' then
+        ---@diagnostic disable-next-line: inject-field
+        e.string = input.stringify_key(e)
+
+        if e.string == config.log_key and e.kind == 'press' then
           display_log = not display_log
         elseif e.ctrl and e.code == 'c' and e.kind == 'press' then
           dispatch { id = 'quit' }
         end
+
         dispatch { id = 'key', data = e }
       elseif e.type == 'mouse' then
         dispatch { id = 'mouse', data = e }
@@ -166,9 +199,13 @@ return function(meta)
   }
 
   repeat
-    local ok, err = pcall(loop)
-    if not ok then exit_err(err) end
+    loop()
   until should_quit
 
   deinit_term()
+end
+
+return function(meta)
+  local ok, err = pcall(run, meta)
+  if not ok then exit_with_err(err) end
 end

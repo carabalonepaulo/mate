@@ -1,5 +1,6 @@
 local App = require 'mate.app'
 local Batch = require 'mate.batch'
+local input = require 'mate.input'
 
 App {
   init = function()
@@ -11,28 +12,22 @@ App {
   end,
 
   update = function(model, msg)
-    local batch = Batch()
-    local cmd
-
-    if msg.id == 'key' and msg.data.kind == 'press' then
-      local code = msg.data.code
-      if code == 'q' or (code == 'c' and msg.data.ctrl) then
-        batch.push { id = 'quit' }
-      elseif code == 'up' and model.state ~= 'done' then
+    if model.state ~= 'done' then
+      if input.pressed(msg, 'up') or input.pressed(msg, 'shift+tab') then
         model.idx = model.idx > 1 and model.idx - 1 or #model.items
-      elseif code == 'down' and model.state ~= 'done' then
+      elseif input.pressed(msg, 'down') or input.pressed(msg, 'tab') then
         model.idx = model.idx < #model.items and model.idx + 1 or 1
-      elseif code == 'enter' then
+      elseif input.pressed(msg, 'enter') then
         model.state = 'done'
         if model.idx == 3 then
-          batch.push { id = 'quit' }
+          return model, { id = 'quit' }
         end
-      elseif code == 'tab' and model.state ~= 'done' then
-        model.idx = model.idx < #model.items and model.idx + 1 or 1
       end
+    elseif input.pressed(msg, 'esc') then
+      model.state = 'menu'
+      model.idx = 1
     end
-
-    return model, batch
+    return model
   end,
 
   view = function(model, buf)

@@ -153,6 +153,147 @@ return function()
 end
 
 end)()
+package.loaded["mate.ds.queue.bounded"] = (function()
+return function(capacity)
+  assert(type(capacity) == 'number' and capacity > 0)
+
+  local DUMMY = false
+
+  local buffer = {}
+  for i = 1, capacity do
+    buffer[i] = DUMMY
+  end
+
+  local head = 1
+  local tail = 1
+  local size = 0
+
+  local function enqueue(value)
+    if size == capacity then
+      return false
+    end
+
+    buffer[tail] = value
+    tail = tail + 1
+    if tail > capacity then
+      tail = 1
+    end
+
+    size = size + 1
+    return true
+  end
+
+  local function dequeue()
+    if size == 0 then
+      return nil
+    end
+
+    local value = buffer[head]
+    buffer[head] = DUMMY
+    head = head + 1
+    if head > capacity then
+      head = 1
+    end
+
+    size = size - 1
+    return value
+  end
+
+  local function peek()
+    if size == 0 then
+      return nil
+    end
+    return buffer[head]
+  end
+
+  local function length()
+    return size
+  end
+
+  local function capacity()
+    return capacity
+  end
+
+  return {
+    enqueue = enqueue,
+    dequeue = dequeue,
+    peek = peek,
+    length = length,
+    capacity = capacity
+  }
+end
+
+end)()
+package.loaded["mate.input"] = (function()
+local ALIAS = {
+  ['backtab'] = 'tab',
+  [' '] = 'space',
+}
+
+return {
+  stringify_key = function(ev)
+    local parts = {}
+    if ev.ctrl then
+      table.insert(parts, 'ctrl')
+    end
+    if ev.alt then
+      table.insert(parts, 'alt')
+    end
+    if ev.shift then
+      table.insert(parts, 'shift')
+    end
+    table.insert(parts, string.lower(ALIAS[ev.code] or ev.code))
+    return table.concat(parts, '+')
+  end,
+
+  hit = function(msg, key_str)
+    return msg.id == 'key' and msg.data.string == key_str and (msg.data.kind == 'press' or msg.data.kind == 'repeat')
+  end,
+
+  pressed = function(msg, key_str)
+    return msg.id == 'key' and msg.data.string == key_str and msg.data.kind == 'press'
+  end,
+
+  released = function(msg, key_str)
+    return msg.id == 'key' and msg.data.string == key_str and msg.data.kind == 'release'
+  end,
+
+  repeated = function(msg, key_str)
+    return msg.id == 'key' and msg.data.string == key_str and msg.data.kind == 'repeat'
+  end,
+
+  num = function(msg)
+    local press = msg.id == 'key' and (msg.data.kind == 'press' or msg.data.kind == 'repeat')
+    local is_num = press and msg.data.code >= '0' and msg.data.code <= '9'
+    return is_num and tonumber(msg.data.code) or nil
+  end,
+
+  char = function(msg)
+    if msg.id ~= 'key' then return nil end
+    if msg.data.ctrl or msg.data.alt then return nil end
+
+    local code = msg.data.code
+    if code == 'enter'
+        or code == 'backspace'
+        or code == 'tab'
+        or code == 'esc'
+        or code == 'up'
+        or code == 'down'
+        or code == 'left'
+        or code == 'right'
+        or code == 'home'
+        or code == 'end'
+        or code == 'pageup'
+        or code == 'pagedown'
+        or code:match('^f%d+$') then
+      return nil
+    end
+
+    return code
+  end,
+}
+
+end)()
 package.loaded["mate.style"] = (function()
 local utf8_pattern = '[%z\1-\127\194-\244][\128-\191]*'
 
@@ -405,13 +546,21 @@ return {
 
 end)()
 package.loaded["mate.app"] = (function()
-local UnboundedQueue = require 'mate.ds.queue.unbounded'
+local BoundedQueue   = require 'mate.ds.queue.bounded'
 
+local input          = require 'mate.input'
 local term           = require 'term'
 local time           = require 'term.time'
 local Buffer         = require 'term.buffer'
 local Log            = require 'mate.components.log'
 local Stack          = require 'mate.ds.stack'
+
+local DEFAULT_CONFIG = {
+  log_key = 'f12',
+  fps = 60,
+  max_msgs = 4096,
+  term_poll_timeout = 1,
+}
 
 local function init_term()
   term:enable_raw_mode()
@@ -430,34 +579,53 @@ local function deinit_term()
   term:flush()
 end
 
-local function exit_err(err)
+local function exit_with_err(err)
   deinit_term()
-  term:println(err)
+  term:println(tostring(err))
   term:println(debug.traceback())
   os.exit(false)
 end
 
-local function safe_init(fn, ...)
-  local ok, model, cmd = pcall(fn, ...)
-  if not ok then
-    exit_err(model)
-  else
-    return model, cmd
+local function load_confg(meta_config)
+  local config = {}
+
+  for k, v in pairs(DEFAULT_CONFIG) do
+    config[k] = v
   end
+
+  if meta_config then
+    local err_msg = 'invalid config value for "%s": expected %s, got %s'
+    for k, v in pairs(meta_config) do
+      if DEFAULT_CONFIG[k] == nil then
+        error(string.format('unknown config key "%s"', k), 2)
+      end
+
+      local nty = type(v)
+      local oty = type(DEFAULT_CONFIG[k])
+      if nty ~= oty then
+        error(string.format(err_msg, k, oty, nty), 2)
+      end
+
+      config[k] = v
+    end
+  end
+
+  return config
 end
 
-return function(meta)
+local function run(meta)
   init_term()
 
-  local msgs = UnboundedQueue()
+  local config = load_confg(meta.config)
+  local msgs = BoundedQueue(config.max_msgs)
   local should_quit = false
-  local model, init_cmd = safe_init(meta.init)
+  local model, init_cmd = meta.init()
 
   local w, h = term:get_size()
   local front_buffer = Buffer.new(w, h)
   local back_buffer = Buffer.new(w, h)
   local last_tick = time.now()
-  local frame_time = 1 / 60
+  local frame_time = 1 / config.fps
   local last_render = 0
 
   local tick_msg_data = { now = 0, dt = 0, budget = 0 }
@@ -465,14 +633,14 @@ return function(meta)
 
   local log_model, log_cmd = Log.init()
   local display_log = false
-  local disptach_stack = Stack()
+  local dispatch_stack = Stack()
 
   local function dispatch(initial)
     if not initial then return end
-    disptach_stack.push(initial)
+    dispatch_stack.push(initial)
 
     local id, data
-    local msg = disptach_stack.pop()
+    local msg = dispatch_stack.pop()
 
     while msg do
       id = msg.id
@@ -480,14 +648,16 @@ return function(meta)
       if id == 'batch' then
         data = msg.data
         for i = #data, 1, -1 do
-          disptach_stack.push(data[i])
+          dispatch_stack.push(data[i])
         end
         data = nil
       else
-        msgs.enqueue(msg)
+        if not msgs.enqueue(msg) then
+          error('msg queue overflow')
+        end
       end
 
-      msg = disptach_stack.pop()
+      msg = dispatch_stack.pop()
     end
   end
 
@@ -502,16 +672,20 @@ return function(meta)
   local function loop()
     local frame_start = time.now()
 
-    local events, err = term:poll(1)
-    if err then exit_err(err) end
+    local events, err = term:poll(config.term_poll_timeout)
+    if err then exit_with_err(err) end
 
     for _, e in ipairs(events) do
       if e.type == 'key' then
-        if e.code == 'f12' and e.kind == 'press' then
+        ---@diagnostic disable-next-line: inject-field
+        e.string = input.stringify_key(e)
+
+        if e.string == config.log_key and e.kind == 'press' then
           display_log = not display_log
         elseif e.ctrl and e.code == 'c' and e.kind == 'press' then
           dispatch { id = 'quit' }
         end
+
         dispatch { id = 'key', data = e }
       elseif e.type == 'mouse' then
         dispatch { id = 'mouse', data = e }
@@ -573,17 +747,22 @@ return function(meta)
   }
 
   repeat
-    local ok, err = pcall(loop)
-    if not ok then exit_err(err) end
+    loop()
   until should_quit
 
   deinit_term()
+end
+
+return function(meta)
+  local ok, err = pcall(run, meta)
+  if not ok then exit_with_err(err) end
 end
 
 end)()
 package.loaded["mate.components.timer"] = (function()
 local Batch = require 'mate.batch'
 local uid = require 'mate.uid'
+local time = require 'term.time'
 
 return {
   init = function(interval)
@@ -603,7 +782,7 @@ return {
     local id = msg.id
 
     if id == 'timer:start' and msg.data == model.uid then
-      model.last_tick = os.clock()
+      model.last_tick = time.now()
       return model
     elseif id == 'timer:stop' and msg.data == model.uid then
       model.last_tick = -1
@@ -702,6 +881,7 @@ end)()
 package.loaded["mate.components.line_input"] = (function()
 local uid = require 'mate.uid'
 local utf8_pattern = '[%z\1-\127\194-\244][\128-\191]*'
+local input = require 'mate.input'
 
 local function pop_grapheme(s)
   local last_start = nil
@@ -717,28 +897,6 @@ local function pop_grapheme(s)
   end
 
   return s:sub(1, last_start - 1)
-end
-
-local function is_text_input(code)
-  if not code then return false end
-
-  if code == 'enter'
-      or code == 'backspace'
-      or code == 'tab'
-      or code == 'esc'
-      or code == 'up'
-      or code == 'down'
-      or code == 'left'
-      or code == 'right'
-      or code == 'home'
-      or code == 'end'
-      or code == 'pageup'
-      or code == 'pagedown'
-      or code:match('^f%d+$') then
-    return false
-  end
-
-  return true
 end
 
 return {
@@ -769,10 +927,9 @@ return {
         return model, model.submit
       end
 
-      if is_text_input(msg.data.code)
-          and not msg.data.ctrl
-          and not msg.data.alt then
-        model.text = model.text .. msg.data.code
+      local c = input.char(msg)
+      if c then
+        model.text = model.text .. c
         return model
       end
     end

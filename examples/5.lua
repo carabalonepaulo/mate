@@ -34,10 +34,6 @@ App {
       model.size = { msg.data.width, msg.data.height }
     end
 
-    if msg.data and msg.data.code == 'c' and msg.data.ctrl and not model.input.enabled then
-      batch.push { id = 'quit' }
-    end
-
     if msg.id == 'line_input:submit' and msg.data.uid == model.input.uid then
       model.text = model.input.text
       model.input.text = ''

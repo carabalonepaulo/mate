@@ -1,5 +1,6 @@
 local uid = require 'uid'
 local utf8_pattern = '[%z\1-\127\194-\244][\128-\191]*'
+local input = require 'input'
 
 local function pop_grapheme(s)
   local last_start = nil
@@ -15,28 +16,6 @@ local function pop_grapheme(s)
   end
 
   return s:sub(1, last_start - 1)
-end
-
-local function is_text_input(code)
-  if not code then return false end
-
-  if code == 'enter'
-      or code == 'backspace'
-      or code == 'tab'
-      or code == 'esc'
-      or code == 'up'
-      or code == 'down'
-      or code == 'left'
-      or code == 'right'
-      or code == 'home'
-      or code == 'end'
-      or code == 'pageup'
-      or code == 'pagedown'
-      or code:match('^f%d+$') then
-    return false
-  end
-
-  return true
 end
 
 return {
@@ -67,10 +46,9 @@ return {
         return model, model.submit
       end
 
-      if is_text_input(msg.data.code)
-          and not msg.data.ctrl
-          and not msg.data.alt then
-        model.text = model.text .. msg.data.code
+      local c = input.char(msg)
+      if c then
+        model.text = model.text .. c
         return model
       end
     end
