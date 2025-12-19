@@ -383,6 +383,7 @@ package.loaded["mate.app"] = (function()
 local UnboundedQueue = require 'mate.queue.unbounded'
 
 local term           = require 'term'
+local time           = require 'term.time'
 local Buffer         = require 'term.buffer'
 local Log            = require 'mate.components.log'
 
@@ -429,8 +430,8 @@ return function(meta)
   local w, h = term:get_size()
   local front_buffer = Buffer.new(w, h)
   local back_buffer = Buffer.new(w, h)
-  local last_tick = os.clock()
-  local frame_time = 1 / 20
+  local last_tick = time.now()
+  local frame_time = 1 / 60
   local last_render = 0
 
   local log_model, log_cmd = Log.init()
@@ -455,6 +456,8 @@ return function(meta)
   end
 
   local function loop()
+    local frame_start = time.now()
+
     local events, err = term:poll(1)
     if err then exit_err(err) end
 
@@ -475,18 +478,23 @@ return function(meta)
         back_buffer:resize(w, h)
         front_buffer:resize(w, h)
         term:clear()
-        dispatch { id = 'window_size', data = { width = w, height = h } }
+        dispatch { id = 'sys:resize', data = { width = w, height = h } }
       end
     end
 
     local msg
     local len = msgs.length()
 
-    local now = os.clock()
+    local now = time.now()
     local dt = now - last_tick
     last_tick = now
+    local time_spent = now - frame_start
+    local budget = math.max(0, frame_time - time_spent)
 
-    model, msg = meta.update(model, { id = 'app:tick', data = { now = now, dt = dt } })
+    model, msg = meta.update(model, {
+      id = 'sys:tick',
+      data = { now = now, dt = dt, budget = budget }
+    })
     dispatch(msg)
 
     for i = 1, len do
@@ -495,7 +503,8 @@ return function(meta)
       dispatch(msg)
     end
 
-    if now - last_render >= frame_time then
+    local render_now = time.now()
+    if render_now - last_render >= frame_time then
       back_buffer:clear()
       if display_log then
         Log.view(log_model, back_buffer)
@@ -503,13 +512,20 @@ return function(meta)
         meta.view(model, back_buffer)
       end
       term:render_diff(back_buffer, front_buffer)
-      last_render = now
+      last_render = render_now
     end
   end
 
   dispatch(init_cmd)
   dispatch(log_cmd)
-  dispatch { id = 'window_size', data = { width = w, height = h } }
+  dispatch {
+    id = 'sys:ready',
+    data = {
+      width = w,
+      height = h,
+      dispatch = dispatch
+    }
+  }
 
   repeat
     local ok, err = pcall(loop)
@@ -534,7 +550,6 @@ return {
 
       start = { id = 'timer:start', data = id },
       stop = { id = 'timer:stop', data = id },
-      tick = { id = 'timer:tick', data = id },
       timeout = { id = 'timer:timeout', data = id }
     }
   end,
@@ -544,18 +559,17 @@ return {
 
     if id == 'timer:start' and msg.data == model.uid then
       model.last_tick = os.clock()
-      return model, model.tick
+      return model
     elseif id == 'timer:stop' and msg.data == model.uid then
       model.last_tick = -1
       return model
-    elseif id == 'timer:tick' and msg.data == model.uid and model.last_tick > 0 then
+    elseif id == 'sys:tick' and model.last_tick > 0 then
       local batch = Batch()
-      local now = os.clock()
+      local now = msg.data.now
       if now - model.last_tick >= model.interval then
         model.last_tick = now
         batch.push(model.timeout)
       end
-      batch.push(model.tick)
       return model, batch
     end
 
@@ -586,11 +600,7 @@ local STYLES = {
   { '▉', '▊', '▋', '▌', '▍', '▎', '▏', '▎', '▍', '▌', '▋', '▊', '▉' }
 }
 
-local __uid = 0
-local function uid()
-  __uid = __uid + 1
-  return __uid
-end
+local uid = require 'mate.uid'
 
 return {
   init = function(tick_interval)
@@ -617,15 +627,15 @@ return {
   update = function(model, msg)
     if msg.id == 'spinner:start' and msg.data.uid == model.uid then
       model.enabled = true
-      return model, { id = 'spinner:tick', data = { uid = model.uid } }
+      return model
     elseif msg.id == 'spinner:stop' and msg.data.uid == model.uid then
       model.enabled = false
     elseif msg.id == 'spinner:style' and msg.data.uid == model.uid then
       model.style = msg.data.style
       model.idx = 1
       model.len = #STYLES[msg.data.style]
-    elseif msg.id == 'spinner:tick' and msg.data.uid == model.uid and model.enabled then
-      local now = os.clock()
+    elseif msg.id == 'sys:tick' and model.enabled then
+      local now = msg.data.now
       if now - model.last_tick >= model.interval then
         model.idx = model.idx + 1
         if model.idx > model.len then
@@ -633,7 +643,7 @@ return {
         end
         model.last_tick = now
       end
-      return model, { id = 'spinner:tick', data = { uid = model.uid } }
+      return model
     end
     return model, nil
   end,

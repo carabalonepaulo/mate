@@ -1,14 +1,9 @@
 local App = require 'mate.app'
 local Batch = require 'mate.batch'
+local uid = require 'mate.uid'
 
 local Text
 do
-  local __uid = 0
-  local function uid()
-    __uid = __uid + 1
-    return __uid
-  end
-
   Text = {
     init = function()
       return {

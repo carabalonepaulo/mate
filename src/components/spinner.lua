@@ -19,11 +19,7 @@ local STYLES = {
   { '▉', '▊', '▋', '▌', '▍', '▎', '▏', '▎', '▍', '▌', '▋', '▊', '▉' }
 }
 
-local __uid = 0
-local function uid()
-  __uid = __uid + 1
-  return __uid
-end
+local uid = require 'uid'
 
 return {
   init = function(tick_interval)
@@ -50,15 +46,15 @@ return {
   update = function(model, msg)
     if msg.id == 'spinner:start' and msg.data.uid == model.uid then
       model.enabled = true
-      return model, { id = 'spinner:tick', data = { uid = model.uid } }
+      return model
     elseif msg.id == 'spinner:stop' and msg.data.uid == model.uid then
       model.enabled = false
     elseif msg.id == 'spinner:style' and msg.data.uid == model.uid then
       model.style = msg.data.style
       model.idx = 1
       model.len = #STYLES[msg.data.style]
-    elseif msg.id == 'spinner:tick' and msg.data.uid == model.uid and model.enabled then
-      local now = os.clock()
+    elseif msg.id == 'sys:tick' and model.enabled then
+      local now = msg.data.now
       if now - model.last_tick >= model.interval then
         model.idx = model.idx + 1
         if model.idx > model.len then
@@ -66,7 +62,7 @@ return {
         end
         model.last_tick = now
       end
-      return model, { id = 'spinner:tick', data = { uid = model.uid } }
+      return model
     end
     return model, nil
   end,

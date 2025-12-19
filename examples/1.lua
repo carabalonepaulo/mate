@@ -118,7 +118,7 @@ App {
       model.should_quit = true
     elseif id == 'log' then
       model.log = msg.data
-    elseif id == 'window_size' then
+    elseif id == 'sys:ready' then
       model.size = { msg.data.width, msg.data.height }
     elseif id == 'key' then
       if msg.data.code == 'a' and msg.data.ctrl and msg.data.kind == 'press' then

@@ -1,6 +1,7 @@
 local UnboundedQueue = require 'queue.unbounded'
 
 local term           = require 'term'
+local time           = require 'term.time'
 local Buffer         = require 'term.buffer'
 local Log            = require 'components.log'
 
@@ -47,7 +48,7 @@ return function(meta)
   local w, h = term:get_size()
   local front_buffer = Buffer.new(w, h)
   local back_buffer = Buffer.new(w, h)
-  local last_tick = os.clock()
+  local last_tick = time.now()
   local frame_time = 1 / 60
   local last_render = 0
 
@@ -73,6 +74,8 @@ return function(meta)
   end
 
   local function loop()
+    local frame_start = time.now()
+
     local events, err = term:poll(1)
     if err then exit_err(err) end
 
@@ -93,18 +96,23 @@ return function(meta)
         back_buffer:resize(w, h)
         front_buffer:resize(w, h)
         term:clear()
-        dispatch { id = 'window_size', data = { width = w, height = h } }
+        dispatch { id = 'sys:resize', data = { width = w, height = h } }
       end
     end
 
     local msg
     local len = msgs.length()
 
-    local now = os.clock()
+    local now = time.now()
     local dt = now - last_tick
     last_tick = now
+    local time_spent = now - frame_start
+    local budget = math.max(0, frame_time - time_spent)
 
-    model, msg = meta.update(model, { id = 'app:tick', data = { now = now, dt = dt } })
+    model, msg = meta.update(model, {
+      id = 'sys:tick',
+      data = { now = now, dt = dt, budget = budget }
+    })
     dispatch(msg)
 
     for i = 1, len do
@@ -113,7 +121,8 @@ return function(meta)
       dispatch(msg)
     end
 
-    if now - last_render >= frame_time then
+    local render_now = time.now()
+    if render_now - last_render >= frame_time then
       back_buffer:clear()
       if display_log then
         Log.view(log_model, back_buffer)
@@ -121,13 +130,20 @@ return function(meta)
         meta.view(model, back_buffer)
       end
       term:render_diff(back_buffer, front_buffer)
-      last_render = now
+      last_render = render_now
     end
   end
 
   dispatch(init_cmd)
   dispatch(log_cmd)
-  dispatch { id = 'window_size', data = { width = w, height = h } }
+  dispatch {
+    id = 'sys:ready',
+    data = {
+      width = w,
+      height = h,
+      dispatch = dispatch
+    }
+  }
 
   repeat
     local ok, err = pcall(loop)

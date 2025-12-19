@@ -4,7 +4,7 @@ local fmt = string.format
 
 App {
   init = function()
-    local timer = Timer.init(0.01)
+    local timer = Timer.init(0.5)
     local model = {
       elapsed = os.clock(),
       timer = timer,
@@ -24,7 +24,7 @@ App {
   end,
 
   view = function(model, buf)
-    buf:write(fmt('Count: %0.2fs\n', model.count))
+    buf:write(fmt('Count: %d\n', model.count))
     buf:write(fmt('Elapsed: %0.2fs', (os.clock() - model.elapsed)))
   end
 }

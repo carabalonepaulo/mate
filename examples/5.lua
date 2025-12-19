@@ -30,7 +30,7 @@ App {
     model.input, cmd = LineInput.update(model.input, msg)
     batch.push(cmd)
 
-    if msg.id == 'window_size' then
+    if msg.id == 'sys:ready' then
       model.size = { msg.data.width, msg.data.height }
     end
 

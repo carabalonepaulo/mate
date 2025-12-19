@@ -11,7 +11,6 @@ return {
 
       start = { id = 'timer:start', data = id },
       stop = { id = 'timer:stop', data = id },
-      tick = { id = 'timer:tick', data = id },
       timeout = { id = 'timer:timeout', data = id }
     }
   end,
@@ -21,18 +20,17 @@ return {
 
     if id == 'timer:start' and msg.data == model.uid then
       model.last_tick = os.clock()
-      return model, model.tick
+      return model
     elseif id == 'timer:stop' and msg.data == model.uid then
       model.last_tick = -1
       return model
-    elseif id == 'timer:tick' and msg.data == model.uid and model.last_tick > 0 then
+    elseif id == 'sys:tick' and model.last_tick > 0 then
       local batch = Batch()
-      local now = os.clock()
+      local now = msg.data.now
       if now - model.last_tick >= model.interval then
         model.last_tick = now
         batch.push(model.timeout)
       end
-      batch.push(model.tick)
       return model, batch
     end
 
