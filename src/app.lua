@@ -1,9 +1,10 @@
-local UnboundedQueue = require 'queue.unbounded'
+local UnboundedQueue = require 'ds.queue.unbounded'
 
 local term           = require 'term'
 local time           = require 'term.time'
 local Buffer         = require 'term.buffer'
 local Log            = require 'components.log'
+local Stack          = require 'ds.stack'
 
 local function init_term()
   term:enable_raw_mode()
@@ -52,24 +53,37 @@ return function(meta)
   local frame_time = 1 / 60
   local last_render = 0
 
+  local tick_msg_data = { now = 0, dt = 0, budget = 0 }
+  local tick_msg = { id = 'sys:tick', data = tick_msg_data }
+
   local log_model, log_cmd = Log.init()
   local display_log = false
+  local disptach_stack = Stack()
 
-  local function dispatch(msg)
-    if not msg then return end
+  local function dispatch(initial)
+    if not initial then return end
+    disptach_stack.push(initial)
 
-    log_model, log_cmd = Log.update(log_model, msg)
-    dispatch(log_cmd)
+    local id, data
+    local msg = disptach_stack.pop()
 
-    if msg.id == 'batch' then
-      for _, m in ipairs(msg.data) do
-        dispatch(m)
+    while msg do
+      id = msg.id
+
+      if id == 'batch' then
+        data = msg.data
+        for i = #data, 1, -1 do
+          disptach_stack.push(data[i])
+        end
+        data = nil
+      else
+        if id == 'quit' then
+          should_quit = true
+        end
+        msgs.enqueue(msg)
       end
-    else
-      if msg.id == 'quit' then
-        should_quit = true
-      end
-      msgs.enqueue(msg)
+
+      msg = disptach_stack.pop()
     end
   end
 
@@ -109,10 +123,10 @@ return function(meta)
     local time_spent = now - frame_start
     local budget = math.max(0, frame_time - time_spent)
 
-    model, msg = meta.update(model, {
-      id = 'sys:tick',
-      data = { now = now, dt = dt, budget = budget }
-    })
+    tick_msg_data.now = now
+    tick_msg_data.dt = dt
+    tick_msg_data.budget = budget
+    model, msg = meta.update(model, tick_msg)
     dispatch(msg)
 
     for i = 1, len do

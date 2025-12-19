@@ -1,4 +1,4 @@
-local CircularBuffer = require 'queue.circular'
+local CircularBuffer = require 'ds.queue.circular'
 
 return {
   init = function()
