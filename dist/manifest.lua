@@ -5,6 +5,7 @@ return {
     ["require 'ds.queue.bounded'"] = "require 'mate.ds.queue.bounded'",
     ["require 'input'"] = "require 'mate.input'",
     ["require 'uid'"] = "require 'mate.uid'",
+    ["require 'box'"] = "require 'mate.box'",
     ["require 'batch'"] = "require 'mate.batch'",
     ["require 'ds.stack'"] = "require 'mate.ds.stack'",
     ["require 'components.log'"] = "require 'mate.components.log'",
@@ -20,8 +21,10 @@ return {
     { 'mate.uid',                   './src/uid.lua' },
     { 'mate.components.log',        './src/components/log.lua' },
     { 'mate.app',                   './src/app.lua' },
+    { 'mate.box',                   './src/box.lua' },
     { 'mate.components.timer',      './src/components/timer.lua' },
     { 'mate.components.spinner',    './src/components/spinner.lua' },
     { 'mate.components.line_input', './src/components/line_input.lua' },
+    { 'mate.components.list',       './src/components/list.lua' },
   }
 }

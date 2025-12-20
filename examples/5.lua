@@ -20,7 +20,7 @@ App {
       size = { 0, 0 },
       input_style = input_style,
     }
-    return model, model.input.enable
+    return model, model.input.msg.enable
   end,
 
   update = function(model, msg)
@@ -35,9 +35,11 @@ App {
     end
 
     if msg.id == 'line_input:submit' and msg.data.uid == model.input.uid then
-      model.text = model.input.text
-      model.input.text = ''
-      return model, model.input.disable
+      if msg.data.text ~= '' then
+        model.text = msg.data.text
+        batch.push(model.input.msg.disable)
+        batch.push(model.input.msg.clear)
+      end
     end
 
     return model, batch

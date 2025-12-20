@@ -43,7 +43,7 @@ return {
 
   char = function(msg)
     if msg.id ~= 'key' then return nil end
-    if msg.data.ctrl or msg.data.alt then return nil end
+    if msg.data.ctrl and not msg.data.alt then return nil end
 
     local code = msg.data.code
     if code == 'enter'

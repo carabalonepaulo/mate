@@ -10,19 +10,19 @@ return {
       last_tick = 0,
       interval = interval,
 
-      start = { id = 'timer:start', data = id },
-      stop = { id = 'timer:stop', data = id },
-      timeout = { id = 'timer:timeout', data = id }
+      start = { id = 'timer:start', data = { uid = id } },
+      stop = { id = 'timer:stop', data = { uid = id } },
+      timeout = { id = 'timer:timeout', data = { uid = id } }
     }
   end,
 
   update = function(model, msg)
     local id = msg.id
 
-    if id == 'timer:start' and msg.data == model.uid then
+    if id == 'timer:start' and msg.data.uid == model.uid then
       model.last_tick = time.now()
       return model
-    elseif id == 'timer:stop' and msg.data == model.uid then
+    elseif id == 'timer:stop' and msg.data.uid == model.uid then
       model.last_tick = -1
       return model
     elseif id == 'sys:tick' and model.last_tick > 0 then

@@ -27,9 +27,14 @@ return {
       placeholder = '',
       enabled = false,
 
-      enable = { id = 'line_input:enable', data = { uid = id } },
-      disable = { id = 'line_input:disable', data = { uid = id } },
-      submit = { id = 'line_input:submit', data = { uid = id } },
+      msg = {
+        enable = { id = 'line_input:enable', data = { uid = id } },
+        disable = { id = 'line_input:disable', data = { uid = id } },
+        clear = { id = 'line_input:clear', data = { uid = id } },
+        submit = function(text)
+          return { id = 'line_input:submit', data = { uid = id, text = text } }
+        end
+      }
     }
   end,
 
@@ -43,7 +48,7 @@ return {
       end
 
       if msg.data.code == 'enter' then
-        return model, model.submit
+        return model, model.msg.submit(model.text)
       end
 
       local c = input.char(msg)
@@ -63,7 +68,7 @@ return {
     end
 
     if id == 'line_input:set_text' then
-      model.text = msg.data.text
+      model.text = msg.data
     elseif id == 'line_input:clear' then
       model.text = ''
     elseif id == 'line_input:enable' then

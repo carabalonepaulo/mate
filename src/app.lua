@@ -146,7 +146,9 @@ local function run(meta)
       elseif e.type == 'resize' then
         w, h = e.width, e.height
         back_buffer:resize(w, h)
+        back_buffer:clear()
         front_buffer:resize(w, h)
+        front_buffer:clear()
         term:clear()
         dispatch { id = 'sys:resize', data = { width = w, height = h } }
       end

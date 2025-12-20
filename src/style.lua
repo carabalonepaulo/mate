@@ -21,6 +21,7 @@ return function()
   local border_char_h = '─'
   local border_tl, border_tr = '┌', '┐'
   local border_bl, border_br = '└', '┘'
+  local border_color = nil
 
   local self = {}
 
@@ -68,6 +69,11 @@ return function()
     return self
   end
 
+  self.border_color = function(color)
+    border_color = color
+    return self
+  end
+
   self.border = function(enable)
     border_enabled = enable
     return self
@@ -99,6 +105,28 @@ return function()
 
   self.get_dims = function() return self_x, self_y, self_w, self_h end
 
+  self.get_layout = function(content_w, content_h)
+    local b_offset = border_enabled and 1 or 0
+
+    local calc_w = (content_w or 0) + pl + pr + (b_offset * 2) + ml + mr
+    local calc_h = (content_h or 0) + pt + pb + (b_offset * 2) + mt + mb
+
+    local final_w = (self_w > 0) and self_w or calc_w
+    local final_h = (self_h > 0) and self_h or calc_h
+
+    local iw = final_w - (ml + mr + pl + pr + (b_offset * 2))
+    local ih = final_h - (mt + mb + pt + pb + (b_offset * 2))
+
+    return {
+      outer_w = final_w,
+      outer_h = final_h,
+      inner_w = iw,
+      inner_h = ih,
+      ix = self_x + ml + pl + b_offset,
+      iy = self_y + mt + pt + b_offset
+    }
+  end
+
   self.draw = function(buf, content_fn)
     buf:push_style()
 
@@ -120,6 +148,7 @@ return function()
       end
     end
 
+    buf:set_fg(border_color)
     local b_offset = 0
     if border_enabled then
       b_offset = 1
@@ -134,6 +163,7 @@ return function()
         buf:move_to(bx + bw - 1, by + i); buf:write(border_char_v)
       end
     end
+    buf:set_fg(nil)
 
     local ix = bx + pl + b_offset
     local iy = by + pt + b_offset

@@ -24,7 +24,7 @@ App {
       model.budget = msg.data.budget
     end
 
-    if msg.id == 'timer:timeout' and msg.data == model.timer.uid then
+    if msg.id == 'timer:timeout' and msg.data.uid == model.timer.uid then
       model.count = model.count + 1
     end
 
