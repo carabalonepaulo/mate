@@ -8,7 +8,7 @@ use crossterm::{
 };
 use ljr::{prelude::*, value::Kind};
 use std::io::Write;
-use unicode_width::UnicodeWidthChar;
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::error::Error;
 
@@ -40,15 +40,17 @@ impl Default for Style {
 
 #[derive(Debug, Clone, PartialEq)]
 struct Cell {
-    ch: char,
+    symbol: String,
     style: Style,
+    width: u8,
 }
 
 impl Default for Cell {
     fn default() -> Self {
         Self {
-            ch: ' ',
+            symbol: " ".to_string(),
             style: Style::default(),
+            width: 1,
         }
     }
 }
@@ -80,24 +82,17 @@ impl Buffer {
             .resize((width * height) as usize, Cell::default());
         self.width = width;
         self.height = height;
-
         self.clip_x = 0;
         self.clip_y = 0;
         self.clip_w = width;
         self.clip_h = height;
-
-        self.cx = 0;
-        self.cy = 0;
-
-        self.style = Style::default();
-        self.styles.clear();
+        self.clear()
     }
 
     pub fn clear(&mut self) {
         self.cx = 0;
         self.cy = 0;
         self.cells.fill(Cell::default());
-
         self.style = Style::default();
         self.styles.clear();
     }
@@ -155,11 +150,9 @@ impl Buffer {
     pub fn reset_style(&mut self) {
         self.style = Style::default();
     }
-
     pub fn push_style(&mut self) {
         self.styles.push(self.style.clone())
     }
-
     pub fn pop_style(&mut self) {
         if let Some(style) = self.styles.pop() {
             self.style = style;
@@ -185,46 +178,64 @@ impl Buffer {
             return;
         }
 
-        for ch in text.chars() {
-            if ch == '\n' {
+        for g in text.graphemes(true) {
+            if g == "\n" {
                 self.move_to_next_line();
                 continue;
             }
 
-            let ch_width = ch.width().unwrap_or(1) as u16;
+            let w = unicode_width::UnicodeWidthStr::width(g) as u16;
 
-            if self.cx + ch_width > self.width {
-                self.move_to_next_line();
+            if w == 0 {
+                if self.cx > 0 {
+                    let idx = (self.cy as usize * self.width as usize) + (self.cx as usize - 1);
+                    let target_idx = if self.cells[idx].width == 0 && self.cx > 1 {
+                        idx - 1
+                    } else {
+                        idx
+                    };
+                    self.cells[target_idx].symbol.push_str(g);
+                }
+                continue;
             }
 
+            if self.cx + w > self.width {
+                self.move_to_next_line();
+            }
             if self.cy >= self.height {
                 break;
             }
 
-            let in_clip_x = self.cx >= self.clip_x && self.cx < (self.clip_x + self.clip_w);
-            let in_clip_y = self.cy >= self.clip_y && self.cy < (self.clip_y + self.clip_h);
-
-            if in_clip_x && in_clip_y {
+            if self.cx >= self.clip_x
+                && self.cx < (self.clip_x + self.clip_w)
+                && self.cy >= self.clip_y
+                && self.cy < (self.clip_y + self.clip_h)
+            {
                 let idx = (self.cy as usize * self.width as usize) + self.cx as usize;
-                if let Some(cell) = self.cells.get_mut(idx) {
-                    *cell = Cell {
-                        ch,
+
+                if self.cells[idx].width == 0 && self.cx > 0 {
+                    self.cells[idx - 1] = Cell::default();
+                }
+
+                if self.cells[idx].width == 2 && w == 1 && (self.cx + 1) < self.width {
+                    self.cells[idx + 1] = Cell::default();
+                }
+
+                self.cells[idx] = Cell {
+                    symbol: g.to_string(),
+                    style: self.style.clone(),
+                    width: w as u8,
+                };
+
+                if w == 2 && (self.cx + 1) < self.width {
+                    self.cells[idx + 1] = Cell {
+                        symbol: String::new(),
                         style: self.style.clone(),
+                        width: 0,
                     };
                 }
-
-                if ch_width > 1 && (self.cx + 1) < self.width {
-                    let next_idx = idx + 1;
-                    if let Some(next_cell) = self.cells.get_mut(next_idx) {
-                        *next_cell = Cell {
-                            ch: '\0',
-                            style: self.style.clone(),
-                        };
-                    }
-                }
             }
-
-            self.cx += ch_width;
+            self.cx += w;
         }
     }
 
@@ -238,13 +249,13 @@ impl Buffer {
 
     pub fn merge(
         &mut self,
-        other: &Buffer,
-        src_x: i32,
-        src_y: i32,
-        dest_x: i32,
-        dest_y: i32,
-        dest_w: i32,
-        dest_h: i32,
+        _other: &Buffer,
+        _src_x: i32,
+        _src_y: i32,
+        _dest_x: i32,
+        _dest_y: i32,
+        _dest_w: i32,
+        _dest_h: i32,
     ) {
     }
 }
@@ -257,69 +268,57 @@ fn new(width: i32, height: i32) -> Buffer {
         cells,
         width,
         height,
-
         cx: 0,
         cy: 0,
-
         clip_x: 0,
         clip_y: 0,
         clip_w: width,
         clip_h: height,
-
         style: Style::default(),
         styles: vec![],
     }
 }
 
 pub fn render_diff(back: &Buffer, front: &mut Buffer, qc: &mut impl Write) -> Result<(), Error> {
-    let mut physical_x: i32 = -999;
-    let mut physical_y: i32 = -999;
-
     let mut cur_fg = None;
     let mut cur_bg = None;
-    let mut cur_attr: Option<Attributes> = None;
+    let mut cur_attr = None;
 
     for y in 0..back.height {
         for x in 0..back.width {
-            let idx = (y * back.width + x) as usize;
+            let idx = (y as usize * back.width as usize) + x as usize;
             let b = &back.cells[idx];
             let f = &front.cells[idx];
 
             if b != f {
-                let cell_to_save = b.clone();
+                front.cells[idx] = b.clone();
 
-                if b.ch == '\0' {
-                    front.cells[idx] = cell_to_save;
+                if b.width == 0 {
                     continue;
                 }
 
-                if x as i32 != physical_x || y as i32 != physical_y {
-                    qc.queue(MoveTo(x as u16, y as u16))?;
-                    physical_x = x as i32;
-                    physical_y = y as i32;
-                }
+                qc.queue(MoveTo(x, y))?;
 
-                let attr_changed = cur_attr != Some(b.style.attr);
-                let fg_changed = cur_fg != Some(b.style.fg);
-                let bg_changed = cur_bg != Some(b.style.bg);
-
-                if attr_changed || fg_changed || bg_changed {
+                if cur_fg != Some(b.style.fg)
+                    || cur_bg != Some(b.style.bg)
+                    || cur_attr != Some(b.style.attr)
+                {
                     qc.queue(SetAttribute(Attribute::Reset))?;
-
                     qc.queue(SetForegroundColor(b.style.fg))?;
                     qc.queue(SetBackgroundColor(b.style.bg))?;
                     qc.queue(SetAttributes(b.style.attr))?;
-
                     cur_fg = Some(b.style.fg);
                     cur_bg = Some(b.style.bg);
                     cur_attr = Some(b.style.attr);
                 }
 
-                qc.queue(Print(b.ch))?;
-                let w = b.ch.width().unwrap_or(1) as i32;
-                physical_x += w;
+                let to_print = if b.symbol.is_empty() { " " } else { &b.symbol };
+                qc.queue(Print(to_print))?;
 
-                front.cells[idx] = cell_to_save;
+                if b.width == 2 && (x + 1) < back.width {
+                    let next_idx = idx + 1;
+                    front.cells[next_idx] = back.cells[next_idx].clone();
+                }
             }
         }
     }

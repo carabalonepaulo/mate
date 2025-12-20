@@ -1,5 +1,7 @@
 pub mod buffer;
+pub mod layout;
 pub mod time;
+pub mod unicode;
 
 use std::{
     io::{Stdout, Write, stdout},

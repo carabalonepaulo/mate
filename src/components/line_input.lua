@@ -1,3 +1,4 @@
+local unicode = require 'term.unicode'
 local uid = require 'uid'
 local utf8_pattern = '[%z\1-\127\194-\244][\128-\191]*'
 local input = require 'input'
@@ -46,7 +47,7 @@ return {
 
     if model.enabled and id == 'key' and msg.data.kind == 'press' then
       if msg.data.code == 'backspace' then
-        model.text = pop_grapheme(model.text)
+        model.text = unicode.pop_grapheme(model.text)
         return model, model.msg.text_changed(model.text)
       end
 

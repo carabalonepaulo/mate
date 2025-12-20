@@ -138,6 +138,7 @@ App {
         .border(true)
         .border_color('#303640')
         .padding(0, 1, 0, 1)
+    -- .border_chars('👨‍👩‍👧‍👦', '👨‍👩‍👧‍👦', '👨‍👩‍👧‍👦', '👨‍👩‍👧‍👦', '👨‍👩‍👧‍👦', '👨‍👩‍👧‍👦')
 
     local model = {
       ready = false,
@@ -186,6 +187,9 @@ App {
       else
         model.found = false
       end
+    elseif input.pressed(msg, 'f10') then
+      batch.push({ id = 'log:push', data = 'clear' })
+      require('term'):clear()
     end
 
     return model, batch

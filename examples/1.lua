@@ -80,12 +80,12 @@ local function done_scene(model, buf)
 end
 
 App {
-  config = { fps = 30 },
+  config = { fps = 60 },
 
   init = function()
     local spinners = {}
     for i = 1, 18 do
-      table.insert(spinners, Spinner.init(0.1))
+      table.insert(spinners, Spinner.init(0.01))
     end
 
     local model = {

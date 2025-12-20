@@ -11,6 +11,7 @@ ljr = { git = "https://github.com/carabalonepaulo/ljr", branch = "main", default
 crossterm = "0.29.0"
 thiserror = "2.0.17"
 unicode-width = "0.2.2"
+unicode-segmentation = "1.12.0"
 
 [features]
 default = ["dynamic"]

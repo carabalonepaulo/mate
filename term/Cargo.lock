@@ -369,6 +369,7 @@ dependencies = [
  "crossterm",
  "ljr",
  "thiserror",
+ "unicode-segmentation",
  "unicode-width",
 ]
 

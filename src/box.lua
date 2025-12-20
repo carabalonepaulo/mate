@@ -1,11 +1,8 @@
--- TODO: unicode-width
-local function visual_width(str)
-  local count = 0
-  for _ in str:gmatch('[%z\1-\127\194-\244][\128-\191]*') do
-    count = count + 1
-  end
-  return count
-end
+local unicode = require 'term.unicode'
+local layout = require 'term.layout'
+
+local visual_width = unicode.width
+local get_horizontal_line = layout.horizontal_line
 
 local function split_lines(str)
   local lines = {}
@@ -14,28 +11,6 @@ local function split_lines(str)
     table.insert(lines, line)
   end
   return lines
-end
-
--- TODO: unicode-segmentation
-local function get_horizontal_line(left, right, mid, total_width)
-  local mid_w = visual_width(mid)
-  local space = total_width - visual_width(left) - visual_width(right)
-  if mid_w <= 0 or space <= 0 then return left .. right end
-
-  local count = math.floor(space / mid_w)
-  local remain = space - (count * mid_w)
-  local extra = ''
-
-  if remain > 0 then
-    local col_count = 0
-    for g in mid:gmatch('[%z\1-\127\194-\244][\128-\191]*') do
-      local w = visual_width(g)
-      if col_count + w > remain then break end
-      extra = extra .. g
-      col_count = col_count + w
-    end
-  end
-  return left .. string.rep(mid, count) .. extra .. right
 end
 
 return function()
