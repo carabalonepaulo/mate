@@ -1,0 +1,18 @@
+[package]
+name = "term"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+ljr = { git = "https://github.com/carabalonepaulo/ljr", branch = "main", default-features = false }
+crossterm = "0.29.0"
+thiserror = "2.0.17"
+unicode-width = "0.2.2"
+
+[features]
+default = ["dynamic"]
+dynamic = ["ljr/dynamic"]
+static = ["ljr/static"]
