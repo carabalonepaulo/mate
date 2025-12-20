@@ -75,6 +75,47 @@ local function layout(model, w, h)
   model.list_layout = model.list_box.resolve()
 end
 
+local function filter(model, text)
+  model.filter = text:lower()
+  local filtered = {}
+
+  for _, n in ipairs(NAMES) do
+    local segments = {}
+
+    if model.filter ~= '' then
+      local name_lower = n:lower()
+      local last_pos = 1
+      local found_match = false
+
+      while true do
+        local s, e = name_lower:find(model.filter, last_pos, true)
+        if not s then break end
+
+        found_match = true
+
+        if s > last_pos then
+          table.insert(segments, { text = n:sub(last_pos, s - 1), highlight = false })
+        end
+
+        table.insert(segments, { text = n:sub(s, e), highlight = true })
+
+        last_pos = e + 1
+      end
+
+      if found_match then
+        if last_pos <= #n then
+          table.insert(segments, { text = n:sub(last_pos), highlight = false })
+        end
+        table.insert(filtered, { text = n, segments = segments })
+      end
+    else
+      table.insert(segments, { text = n, highlight = false })
+      table.insert(filtered, { text = n, segments = segments })
+    end
+  end
+  return filtered
+end
+
 App {
   config = {
     fps = 60,
@@ -128,7 +169,7 @@ App {
     if msg.id == 'sys:ready' then
       model.ready = true
       layout(model, msg.data.width, msg.data.height)
-      batch.push(model.list.msg.append(NAMES))
+      batch.push(model.list.msg.append(filter(model, model.filter)))
       batch.push(model.list.msg.set_size(model.list_layout.iw, model.list_layout.ih))
     elseif msg.id == 'sys:resize' then
       layout(model, msg.data.width, msg.data.height)
@@ -137,16 +178,8 @@ App {
       batch.push(model.input.msg.clear)
     elseif msg.id == 'line_input:submit' and msg.data.uid == model.input.uid then
     elseif msg.id == 'line_input:text_changed' and msg.data.uid == model.input.uid then
-      model.filter = msg.data.text:lower()
-
-      local filtered = {}
-      for _, n in ipairs(NAMES) do
-        if n:lower():find(model.filter, 1, true) then
-          table.insert(filtered, n)
-        end
-      end
+      local filtered = filter(model, msg.data.text)
       batch.push(model.list.msg.clear)
-
       if #filtered > 0 then
         model.found = true
         batch.push(model.list.msg.append(filtered))
@@ -172,24 +205,15 @@ App {
     model.list_box.draw(buf, model.list_layout, function(x, y, w, h)
       if model.found then
         buf:move_to(x, y)
-        List.view(model.list, buf, x, y, w, h, function(idx, name)
-          if model.filter ~= '' then
-            local s, e = name:lower():find(model.filter, 1, true)
-
-            if s then
-              local first, mid, last = name:sub(1, s - 1), name:sub(s, e), name:sub(e + 1)
-              buf:write(first)
-
+        List.view(model.list, buf, x, y, w, h, function(idx, result)
+          for _, seg in ipairs(result.segments) do
+            if seg.highlight then
               buf:set_fg('#a84c32')
-              buf:write(mid)
+              buf:write(seg.text)
               buf:set_fg(nil)
-
-              buf:write(last)
             else
-              buf:write(name)
+              buf:write(seg.text)
             end
-          else
-            buf:write(name)
           end
         end)
       else

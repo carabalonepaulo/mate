@@ -8,7 +8,14 @@ return {
   update = function(model, msg)
     if msg.id == 'log:push' then
       model.push(msg.data)
+    elseif msg.id ~= 'sys:tick' then
+      if msg.id == 'key' then
+        model.push(string.format('[key] %s', msg.data.string))
+      else
+        model.push(string.format('[%s]', msg.id))
+      end
     end
+
     return model, nil
   end,
 
