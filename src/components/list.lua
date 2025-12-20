@@ -26,7 +26,11 @@ return {
         end,
         push = function(value)
           return { id = 'list:push', data = { uid = id, value = value } }
-        end
+        end,
+        append = function(items)
+          return { id = 'list:append', data = { uid = id, items = items } }
+        end,
+        clear = { id = 'list:clear', data = { uid = id } }
       }
     }
   end,
@@ -36,13 +40,21 @@ return {
       table.insert(model.list, msg.data.value)
     elseif msg.id == 'list:set_size' and msg.data.uid == model.uid then
       model.size = { msg.data.width, msg.data.height }
+    elseif msg.id == 'list:append' and msg.data.uid == model.uid then
+      for _, v in ipairs(msg.data.items) do
+        table.insert(model.list, v)
+      end
+    elseif msg.id == 'list:clear' and msg.data.uid then
+      model.list = {}
+      model.offset = 0
+      model.user_scrolled = false
     elseif input.pressed(msg, 'up') then
       model.offset = model.offset - 1
       model.user_scrolled = true
     elseif input.pressed(msg, 'down') then
       model.offset = model.offset + 1
       model.user_scrolled = true
-    elseif input.pressed(msg, 'home') or (msg.id == 'list:reset' and msg.data.uid == model.uid) then
+    elseif input.pressed(msg, 'home') then
       model.offset = 0
       model.user_scrolled = true
     elseif input.pressed(msg, 'end') then

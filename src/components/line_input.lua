@@ -31,6 +31,9 @@ return {
         enable = { id = 'line_input:enable', data = { uid = id } },
         disable = { id = 'line_input:disable', data = { uid = id } },
         clear = { id = 'line_input:clear', data = { uid = id } },
+        text_changed = function(text)
+          return { id = 'line_input:text_changed', data = { uid = id, text = text } }
+        end,
         submit = function(text)
           return { id = 'line_input:submit', data = { uid = id, text = text } }
         end
@@ -44,7 +47,7 @@ return {
     if model.enabled and id == 'key' and msg.data.kind == 'press' then
       if msg.data.code == 'backspace' then
         model.text = pop_grapheme(model.text)
-        return model
+        return model, model.msg.text_changed(model.text)
       end
 
       if msg.data.code == 'enter' then
@@ -54,13 +57,13 @@ return {
       local c = input.char(msg)
       if c then
         model.text = model.text .. c
-        return model
+        return model, model.msg.text_changed(model.text)
       end
     end
 
     if id == 'paste' then
       model.text = model.text .. msg.data
-      return model
+      return model, model.msg.text_changed(model.text)
     end
 
     if not (msg.data and msg.data.uid == model.uid) then
@@ -71,6 +74,7 @@ return {
       model.text = msg.data
     elseif id == 'line_input:clear' then
       model.text = ''
+      return model, model.msg.text_changed(model.text)
     elseif id == 'line_input:enable' then
       model.enabled = true
     elseif id == 'line_input:disable' then

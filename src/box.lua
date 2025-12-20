@@ -1,4 +1,4 @@
--- TODO: wcwidth
+-- TODO: unicode-width
 local function visual_width(str)
   local count = 0
   for _ in str:gmatch('[%z\1-\127\194-\244][\128-\191]*') do
@@ -14,6 +14,28 @@ local function split_lines(str)
     table.insert(lines, line)
   end
   return lines
+end
+
+-- TODO: unicode-segmentation
+local function get_horizontal_line(left, right, mid, total_width)
+  local mid_w = visual_width(mid)
+  local space = total_width - visual_width(left) - visual_width(right)
+  if mid_w <= 0 or space <= 0 then return left .. right end
+
+  local count = math.floor(space / mid_w)
+  local remain = space - (count * mid_w)
+  local extra = ''
+
+  if remain > 0 then
+    local col_count = 0
+    for g in mid:gmatch('[%z\1-\127\194-\244][\128-\191]*') do
+      local w = visual_width(g)
+      if col_count + w > remain then break end
+      extra = extra .. g
+      col_count = col_count + w
+    end
+  end
+  return left .. string.rep(mid, count) .. extra .. right
 end
 
 return function()
@@ -149,19 +171,17 @@ return function()
 
       for i = 1, layout.b_ht do
         local lt, rt, mid = p.tl[i] or '', p.tr[i] or '', p.h[i] or ''
-        local mid_w = visual_width(mid)
-        local count = mid_w > 0 and math.floor((layout.bw - (visual_width(lt) + visual_width(rt))) / mid_w) or 0
+        local line = get_horizontal_line(lt, rt, mid, layout.bw)
         buf:move_to(layout.bx, layout.by + i - 1)
-        buf:write(lt .. string.rep(mid, count) .. rt)
+        buf:write(line)
       end
 
       local by_bot = layout.by + layout.bh - layout.b_hb
       for i = 1, layout.b_hb do
         local lb, rb, mid = p.bl[i] or '', p.br[i] or '', p.h[i] or ''
-        local mid_w = visual_width(mid)
-        local count = mid_w > 0 and math.floor((layout.bw - (visual_width(lb) + visual_width(rb))) / mid_w) or 0
+        local line = get_horizontal_line(lb, rb, mid, layout.bw)
         buf:move_to(layout.bx, by_bot + i - 1)
-        buf:write(lb .. string.rep(mid, count) .. rb)
+        buf:write(line)
       end
 
       local w_v = visual_width(c.border_chars.v)
