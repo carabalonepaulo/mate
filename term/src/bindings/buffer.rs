@@ -235,6 +235,18 @@ impl Buffer {
         self.write(text);
         (self.cx, self.cy) = (old_x, old_y);
     }
+
+    pub fn merge(
+        &mut self,
+        other: &Buffer,
+        src_x: i32,
+        src_y: i32,
+        dest_x: i32,
+        dest_y: i32,
+        dest_w: i32,
+        dest_h: i32,
+    ) {
+    }
 }
 
 fn new(width: i32, height: i32) -> Buffer {
