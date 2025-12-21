@@ -247,16 +247,54 @@ impl Buffer {
         (self.cx, self.cy) = (old_x, old_y);
     }
 
-    pub fn merge(
+    pub fn blit(
         &mut self,
-        _other: &Buffer,
-        _src_x: i32,
-        _src_y: i32,
-        _dest_x: i32,
-        _dest_y: i32,
-        _dest_w: i32,
-        _dest_h: i32,
+        other: &Buffer,
+        src_x: i32,
+        src_y: i32,
+        dest_x: i32,
+        dest_y: i32,
+        dest_w: i32,
+        dest_h: i32,
     ) {
+        let src_start_x = src_x.max(0);
+        let src_start_y = src_y.max(0);
+
+        let src_end_x = (src_x + dest_w).min(other.width as _);
+        let src_end_y = (src_y + dest_h).min(other.height as _);
+
+        for sy in src_start_y..src_end_y {
+            let dy = dest_y + (sy - src_y);
+            if dy < 0 || dy >= self.height as _ {
+                continue;
+            }
+
+            for sx in src_start_x..src_end_x {
+                let dx = dest_x + (sx - src_x);
+                if dx < 0 || dx >= self.width as _ {
+                    continue;
+                }
+
+                let src_idx = (sy as usize * other.width as usize) + sx as usize;
+                let dest_idx = (dy as usize * self.width as usize) + dx as usize;
+
+                let cell = &other.cells[src_idx];
+
+                if cell.width == 0 {
+                    continue;
+                }
+
+                self.cells[dest_idx] = cell.clone();
+
+                if cell.width == 2 && (dx + 1) < (self.width as _) && (sx + 1) < (other.width as _)
+                {
+                    let src_next_idx = src_idx + 1;
+                    let dest_next_idx = dest_idx + 1;
+
+                    self.cells[dest_next_idx] = other.cells[src_next_idx].clone();
+                }
+            }
+        }
     }
 }
 
