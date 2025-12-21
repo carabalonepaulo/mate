@@ -56,6 +56,16 @@ return function(capacity)
     end
   end
 
+  local function at(idx)
+    assert(idx >= 1 and idx <= size, string.format('index %d out of bounds, len is %d', idx, size))
+
+    local physical = head + idx - 1
+    if physical > capacity then
+      physical = physical - capacity
+    end
+    return buffer[physical]
+  end
+
   local function items()
     local i = 0
     return function()
@@ -96,6 +106,7 @@ return function(capacity)
   end
 
   return {
+    at = at,
     push = push,
     items = items,
     peek = peek,
@@ -532,34 +543,144 @@ return function()
 end
 
 end)()
-package.loaded["mate.components.log"] = (function()
-local CircularBuffer = require 'mate.ds.queue.circular'
+package.loaded["mate.components.indexed_view"] = (function()
+local input = require 'mate.input'
+local uid = require 'mate.uid'
+
+local function clamp(value, min, max)
+  if value < min then
+    return min
+  elseif value > max then
+    return max
+  end
+  return value
+end
 
 return {
   init = function()
-    return CircularBuffer(16)
+    local id = uid()
+    return {
+      uid = id,
+      len = 0,
+      offset = 0,
+      height = 0,
+      user_scrolled = false,
+
+      msg = {
+        set_len = function(len)
+          return { id = 'indexed_view:set_len', data = { uid = id, len = len } }
+        end,
+        set_height = function(h)
+          return { id = 'indexed_view:set_height', data = { uid = id, height = h } }
+        end,
+        reset = { id = 'indexed_view:reset', data = { uid = id } }
+      }
+    }
   end,
 
   update = function(model, msg)
-    if msg.id == 'log:push' then
-      model.push(msg.data)
-    elseif msg.id ~= 'sys:tick' then
-      if msg.id == 'key' then
-        model.push(string.format('[key] %s', msg.data.string))
+    if msg.id == 'indexed_view:set_len' and msg.data.uid == model.uid then
+      model.len = msg.data.len
+    elseif msg.id == 'indexed_view:set_height' and msg.data.uid == model.uid then
+      model.height = msg.data.height
+    elseif msg.id == 'indexed_view:reset' and msg.data.uid then
+      model.len = 0
+      model.offset = 0
+      model.user_scrolled = false
+    elseif input.pressed(msg, 'up') then
+      model.offset = model.offset - 1
+      model.user_scrolled = true
+    elseif input.pressed(msg, 'down') then
+      model.offset = model.offset + 1
+      model.user_scrolled = true
+    elseif input.pressed(msg, 'home') then
+      model.offset = 0
+      model.user_scrolled = true
+    elseif input.pressed(msg, 'end') then
+      model.offset = math.huge
+      model.user_scrolled = false
+    end
+
+    local max_offset = math.max(0, model.len - model.height)
+
+    if model.len <= model.height then
+      model.offset = 0
+      model.user_scrolled = false
+    else
+      if model.user_scrolled then
+        model.offset = clamp(model.offset, 0, max_offset)
+        if model.offset == max_offset then model.user_scrolled = false end
       else
-        model.push(string.format('[%s]', msg.id))
+        model.offset = max_offset
       end
     end
 
-    return model, nil
+    return model
+  end,
+
+  view = function(model, x, y, fn)
+    for i = 1, model.height do
+      local item_idx = model.offset + i
+      if item_idx > model.len then
+        break
+      end
+      fn(x, y + (i - 1), item_idx)
+    end
+  end,
+}
+
+end)()
+package.loaded["mate.components.log"] = (function()
+local CircularBuffer = require 'mate.ds.queue.circular'
+local IndexedView = require 'mate.components.indexed_view'
+
+return {
+  init = function(cap)
+    local view = IndexedView.init()
+    return {
+      ready = false,
+      size = { 0, 0 },
+      view = view,
+      lines = CircularBuffer(cap)
+    }
+  end,
+
+  update = function(model, msg)
+    model.view = IndexedView.update(model.view, msg)
+
+    if msg.id == 'log:push' then
+      model.lines.push(msg.data)
+      model.view = IndexedView.update(model.view, model.view.msg.set_len(model.lines.length()))
+    elseif msg.id == 'sys:ready' then
+      model.size[0] = msg.data.width
+      model.size[1] = msg.data.height
+      model.ready = true
+      model.view = IndexedView.update(model.view, model.view.msg.set_height(msg.data.height - 2))
+    elseif msg.id == 'sys:resize' then
+      model.size[0] = msg.data.width
+      model.size[1] = msg.data.height
+      model.view = IndexedView.update(model.view, model.view.msg.set_height(msg.data.height - 2))
+    elseif msg.id ~= 'sys:tick' then
+      if msg.id == 'key' then
+        if not (msg.data.code == 'up' or msg.data.code == 'down') then
+          model.lines.push(string.format('[key] %s', msg.data.string))
+        end
+      else
+        model.lines.push(string.format('[%s]', msg.id))
+      end
+      model.view = IndexedView.update(model.view, model.view.msg.set_len(model.lines.length()))
+    end
+
+    return model
   end,
 
   view = function(model, buf)
-    buf:move_to_next_line()
+    if not model.ready then return end
 
-    for line in model.items() do
-      buf:move_to_col(2)
+    IndexedView.view(model.view, 2, 2, function(x, y, idx)
+      buf:move_to(x, y)
 
+      local line = model.lines.at(idx)
       local location, num, err = string.match(line, '^(.*:)(%d+): (.*)$')
       if location and num and err then
         buf:set_attr('dim')
@@ -577,225 +698,9 @@ return {
         buf:write(line)
         buf:move_to_next_line()
       end
-    end
+    end)
   end,
 }
-
-end)()
-package.loaded["mate.app"] = (function()
-local BoundedQueue   = require 'mate.ds.queue.bounded'
-
-local input          = require 'mate.input'
-local term           = require 'term'
-local time           = require 'term.time'
-local Buffer         = require 'term.buffer'
-local Log            = require 'mate.components.log'
-local Stack          = require 'mate.ds.stack'
-
-local DEFAULT_CONFIG = {
-  log_key = 'f12',
-  fps = 60,
-  max_msgs = 4096,
-  term_poll_timeout = 1,
-}
-
-local function init_term()
-  term:enable_raw_mode()
-  term:enter_alt_screen()
-  term:enable_bracketed_paste()
-  term:hide_cursor()
-  term:move_cursor(0, 0)
-  term:flush()
-end
-
-local function deinit_term()
-  term:disable_raw_mode()
-  term:leave_alt_screen()
-  term:disable_bracketed_paste()
-  term:show_cursor()
-  term:flush()
-end
-
-local function exit_with_err(err)
-  deinit_term()
-  term:println(tostring(err))
-  term:println(debug.traceback())
-  os.exit(false)
-end
-
-local function load_confg(meta_config)
-  local config = {}
-
-  for k, v in pairs(DEFAULT_CONFIG) do
-    config[k] = v
-  end
-
-  if meta_config then
-    local err_msg = 'invalid config value for "%s": expected %s, got %s'
-    for k, v in pairs(meta_config) do
-      if DEFAULT_CONFIG[k] == nil then
-        error(string.format('unknown config key "%s"', k), 2)
-      end
-
-      local nty = type(v)
-      local oty = type(DEFAULT_CONFIG[k])
-      if nty ~= oty then
-        error(string.format(err_msg, k, oty, nty), 2)
-      end
-
-      config[k] = v
-    end
-  end
-
-  return config
-end
-
-local function run(meta)
-  init_term()
-
-  local config = load_confg(meta.config)
-  local msgs = BoundedQueue(config.max_msgs)
-  local should_quit = false
-  local model, init_cmd = meta.init()
-
-  local w, h = term:get_size()
-  local front_buffer = Buffer.new(w, h)
-  local back_buffer = Buffer.new(w, h)
-  local last_tick = time.now()
-  local frame_time = 1 / config.fps
-  local last_render = 0
-
-  local tick_msg_data = { now = 0, dt = 0, budget = 0 }
-  local tick_msg = { id = 'sys:tick', data = tick_msg_data }
-
-  local log_model, log_cmd = Log.init()
-  local display_log = false
-  local dispatch_stack = Stack()
-
-  local function dispatch(initial)
-    if not initial then return end
-    dispatch_stack.push(initial)
-
-    local id, data
-    local msg = dispatch_stack.pop()
-
-    while msg do
-      id = msg.id
-
-      if id == 'batch' then
-        data = msg.data
-        for i = #data, 1, -1 do
-          dispatch_stack.push(data[i])
-        end
-        data = nil
-      else
-        if not msgs.enqueue(msg) then
-          error('msg queue overflow')
-        end
-      end
-
-      msg = dispatch_stack.pop()
-    end
-  end
-
-  local function observe(msg)
-    log_model = Log.update(log_model, msg)
-
-    if msg.id == 'quit' then
-      should_quit = true
-    end
-  end
-
-  local function loop()
-    local frame_start = time.now()
-
-    local events, err = term:poll(config.term_poll_timeout)
-    if err then exit_with_err(err) end
-
-    for _, e in ipairs(events) do
-      if e.type == 'key' then
-        ---@diagnostic disable-next-line: inject-field
-        e.string = input.stringify_key(e)
-
-        if e.string == config.log_key and e.kind == 'press' then
-          display_log = not display_log
-        elseif e.ctrl and e.code == 'c' and e.kind == 'press' then
-          dispatch { id = 'quit' }
-        end
-
-        dispatch { id = 'key', data = e }
-      elseif e.type == 'mouse' then
-        dispatch { id = 'mouse', data = e }
-      elseif e.type == 'paste' then
-        dispatch { id = 'paste', data = e.content }
-      elseif e.type == 'resize' then
-        w, h = e.width, e.height
-        back_buffer:resize(w, h)
-        back_buffer:clear()
-        front_buffer:resize(w, h)
-        front_buffer:clear()
-        term:clear()
-        dispatch { id = 'sys:resize', data = { width = w, height = h } }
-      end
-    end
-
-    local msg
-    local len = msgs.length()
-
-    local now = time.now()
-    local dt = now - last_tick
-    last_tick = now
-    local time_spent = now - frame_start
-    local budget = math.max(0, frame_time - time_spent)
-
-    tick_msg_data.now = now
-    tick_msg_data.dt = dt
-    tick_msg_data.budget = budget
-    model, msg = meta.update(model, tick_msg)
-    dispatch(msg)
-
-    for i = 1, len do
-      msg = msgs.dequeue()
-      observe(msg)
-      model, msg = meta.update(model, msg)
-      dispatch(msg)
-    end
-
-    local render_now = time.now()
-    if render_now - last_render >= frame_time then
-      back_buffer:clear()
-      if display_log then
-        Log.view(log_model, back_buffer)
-      else
-        meta.view(model, back_buffer)
-      end
-      term:render_diff(back_buffer, front_buffer)
-      last_render = render_now
-    end
-  end
-
-  dispatch(init_cmd)
-  dispatch(log_cmd)
-  dispatch {
-    id = 'sys:ready',
-    data = {
-      width = w,
-      height = h,
-      dispatch = dispatch
-    }
-  }
-
-  repeat
-    loop()
-  until should_quit
-
-  deinit_term()
-end
-
-return function(meta)
-  local ok, err = pcall(run, meta)
-  if not ok then exit_with_err(err) end
-end
 
 end)()
 package.loaded["mate.box"] = (function()
@@ -805,15 +710,6 @@ local layout = require 'term.layout'
 local visual_width = unicode.width
 local get_horizontal_line = layout.horizontal_line
 
--- TODO: unicode-width
--- local function visual_width(str)
---   local count = 0
---   for _ in str:gmatch('[%z\1-\127\194-\244][\128-\191]*') do
---     count = count + 1
---   end
---   return count
--- end
-
 local function split_lines(str)
   local lines = {}
   if str == '' then return lines end
@@ -822,28 +718,6 @@ local function split_lines(str)
   end
   return lines
 end
-
--- TODO: unicode-segmentation
--- local function get_horizontal_line(left, right, mid, total_width)
---   local mid_w = visual_width(mid)
---   local space = total_width - visual_width(left) - visual_width(right)
---   if mid_w <= 0 or space <= 0 then return left .. right end
-
---   local count = math.floor(space / mid_w)
---   local remain = space - (count * mid_w)
---   local extra = ''
-
---   if remain > 0 then
---     local col_count = 0
---     for g in mid:gmatch('[%z\1-\127\194-\244][\128-\191]*') do
---       local w = visual_width(g)
---       if col_count + w > remain then break end
---       extra = extra .. g
---       col_count = col_count + w
---     end
---   end
---   return left .. string.rep(mid, count) .. extra .. right
--- end
 
 return function()
   local cfg = {
@@ -1016,6 +890,223 @@ return function()
   end
 
   return self
+end
+
+end)()
+package.loaded["mate.app"] = (function()
+local BoundedQueue   = require 'mate.ds.queue.bounded'
+
+local input          = require 'mate.input'
+local term           = require 'term'
+local time           = require 'term.time'
+local Buffer         = require 'term.buffer'
+local Log            = require 'mate.components.log'
+local Stack          = require 'mate.ds.stack'
+
+local DEFAULT_CONFIG = {
+  log_key = 'f12',
+  fps = 60,
+  max_msgs = 4096,
+  max_logs = 256,
+  term_poll_timeout = 1,
+}
+
+local function init_term()
+  term:enable_raw_mode()
+  term:enter_alt_screen()
+  term:enable_bracketed_paste()
+  term:hide_cursor()
+  term:move_cursor(0, 0)
+  term:flush()
+end
+
+local function deinit_term()
+  term:disable_raw_mode()
+  term:leave_alt_screen()
+  term:disable_bracketed_paste()
+  term:show_cursor()
+  term:flush()
+end
+
+local function exit_with_err(err)
+  deinit_term()
+  term:println(tostring(err))
+  term:println(debug.traceback())
+  os.exit(false)
+end
+
+local function load_confg(meta_config)
+  local config = {}
+
+  for k, v in pairs(DEFAULT_CONFIG) do
+    config[k] = v
+  end
+
+  if meta_config then
+    local err_msg = 'invalid config value for "%s": expected %s, got %s'
+    for k, v in pairs(meta_config) do
+      if DEFAULT_CONFIG[k] == nil then
+        error(string.format('unknown config key "%s"', k), 2)
+      end
+
+      local nty = type(v)
+      local oty = type(DEFAULT_CONFIG[k])
+      if nty ~= oty then
+        error(string.format(err_msg, k, oty, nty), 2)
+      end
+
+      config[k] = v
+    end
+  end
+
+  return config
+end
+
+local function run(meta)
+  init_term()
+
+  local config = load_confg(meta.config)
+  local msgs = BoundedQueue(config.max_msgs)
+  local should_quit = false
+  local model, init_cmd = meta.init()
+
+  local w, h = term:get_size()
+  local front_buffer = Buffer.new(w, h)
+  local back_buffer = Buffer.new(w, h)
+  local last_tick = time.now()
+  local frame_time = 1 / config.fps
+  local last_render = 0
+
+  local tick_msg_data = { now = 0, dt = 0, budget = 0 }
+  local tick_msg = { id = 'sys:tick', data = tick_msg_data }
+
+  local log_model, log_cmd = Log.init(config.max_logs)
+  local display_log = false
+  local dispatch_stack = Stack()
+
+  local function dispatch(initial)
+    if not initial then return end
+    dispatch_stack.push(initial)
+
+    local id, data
+    local msg = dispatch_stack.pop()
+
+    while msg do
+      id = msg.id
+
+      if id == 'batch' then
+        data = msg.data
+        for i = #data, 1, -1 do
+          dispatch_stack.push(data[i])
+        end
+        data = nil
+      else
+        if not msgs.enqueue(msg) then
+          error('msg queue overflow')
+        end
+      end
+
+      msg = dispatch_stack.pop()
+    end
+  end
+
+  local function observe(msg)
+    log_model = Log.update(log_model, msg)
+
+    if msg.id == 'quit' then
+      should_quit = true
+    end
+  end
+
+  local function loop()
+    local frame_start = time.now()
+
+    local events, err = term:poll(config.term_poll_timeout)
+    if err then exit_with_err(err) end
+
+    for _, e in ipairs(events) do
+      if e.type == 'key' then
+        ---@diagnostic disable-next-line: inject-field
+        e.string = input.stringify_key(e)
+
+        if e.string == config.log_key and e.kind == 'press' then
+          display_log = not display_log
+        elseif e.ctrl and e.code == 'c' and e.kind == 'press' then
+          dispatch { id = 'quit' }
+        end
+
+        dispatch { id = 'key', data = e }
+      elseif e.type == 'mouse' then
+        dispatch { id = 'mouse', data = e }
+      elseif e.type == 'paste' then
+        dispatch { id = 'paste', data = e.content }
+      elseif e.type == 'resize' then
+        w, h = e.width, e.height
+        back_buffer:resize(w, h)
+        back_buffer:clear()
+        front_buffer:resize(w, h)
+        front_buffer:clear()
+        term:clear()
+        dispatch { id = 'sys:resize', data = { width = w, height = h } }
+      end
+    end
+
+    local msg
+    local len = msgs.length()
+
+    local now = time.now()
+    local dt = now - last_tick
+    last_tick = now
+    local time_spent = now - frame_start
+    local budget = math.max(0, frame_time - time_spent)
+
+    tick_msg_data.now = now
+    tick_msg_data.dt = dt
+    tick_msg_data.budget = budget
+    model, msg = meta.update(model, tick_msg)
+    dispatch(msg)
+
+    for i = 1, len do
+      msg = msgs.dequeue()
+      observe(msg)
+      model, msg = meta.update(model, msg)
+      dispatch(msg)
+    end
+
+    local render_now = time.now()
+    if render_now - last_render >= frame_time then
+      back_buffer:clear()
+      if display_log then
+        Log.view(log_model, back_buffer)
+      else
+        meta.view(model, back_buffer)
+      end
+      term:render_diff(back_buffer, front_buffer)
+      last_render = render_now
+    end
+  end
+
+  dispatch(init_cmd)
+  dispatch(log_cmd)
+  dispatch {
+    id = 'sys:ready',
+    data = {
+      width = w,
+      height = h,
+      dispatch = dispatch
+    }
+  }
+
+  repeat
+    loop()
+  until should_quit
+
+  deinit_term()
+end
+
+return function(meta)
+  local ok, err = pcall(run, meta)
+  if not ok then exit_with_err(err) end
 end
 
 end)()

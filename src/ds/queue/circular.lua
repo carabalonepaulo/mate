@@ -30,6 +30,16 @@ return function(capacity)
     end
   end
 
+  local function at(idx)
+    assert(idx >= 1 and idx <= size, string.format('index %d out of bounds, len is %d', idx, size))
+
+    local physical = head + idx - 1
+    if physical > capacity then
+      physical = physical - capacity
+    end
+    return buffer[physical]
+  end
+
   local function items()
     local i = 0
     return function()
@@ -70,6 +80,7 @@ return function(capacity)
   end
 
   return {
+    at = at,
     push = push,
     items = items,
     peek = peek,

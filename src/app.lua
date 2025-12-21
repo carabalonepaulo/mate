@@ -11,6 +11,7 @@ local DEFAULT_CONFIG = {
   log_key = 'f12',
   fps = 60,
   max_msgs = 4096,
+  max_logs = 256,
   term_poll_timeout = 1,
 }
 
@@ -83,7 +84,7 @@ local function run(meta)
   local tick_msg_data = { now = 0, dt = 0, budget = 0 }
   local tick_msg = { id = 'sys:tick', data = tick_msg_data }
 
-  local log_model, log_cmd = Log.init()
+  local log_model, log_cmd = Log.init(config.max_logs)
   local display_log = false
   local dispatch_stack = Stack()
 

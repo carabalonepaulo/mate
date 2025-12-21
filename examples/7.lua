@@ -120,6 +120,7 @@ App {
   config = {
     fps = 60,
     log_key = 'f12',
+    term_poll_timeout = 10,
   },
 
   init = function()
@@ -189,7 +190,6 @@ App {
       end
     elseif input.pressed(msg, 'f10') then
       batch.push({ id = 'log:push', data = 'clear' })
-      require('term'):clear()
     end
 
     return model, batch
