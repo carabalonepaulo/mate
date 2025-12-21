@@ -85,6 +85,21 @@ return function()
     return self
   end
 
+  self.fg = function(fg)
+    cfg.sfg = fg
+    return self
+  end
+
+  self.bg = function(bg)
+    cfg.sbg = bg
+    return self
+  end
+
+  self.attr = function(attr)
+    cfg.sattr = attr
+    return self
+  end
+
   self.resolve = function(content_w, content_h)
     content_w, content_h = content_w or 0, content_h or 0
     local b = cfg.border_chars

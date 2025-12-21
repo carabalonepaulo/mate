@@ -257,21 +257,23 @@ impl Buffer {
         dest_w: i32,
         dest_h: i32,
     ) {
-        let src_start_x = src_x.max(0);
-        let src_start_y = src_y.max(0);
+        let src_x = (src_x - 1).max(0);
+        let src_y = (src_y - 1).max(0);
+        let dest_x = (dest_x - 1).max(0);
+        let dest_y = (dest_y - 1).max(0);
 
-        let src_end_x = (src_x + dest_w).min(other.width as _);
-        let src_end_y = (src_y + dest_h).min(other.height as _);
+        let src_end_x = (src_x + dest_w).min(other.width as i32);
+        let src_end_y = (src_y + dest_h).min(other.height as i32);
 
-        for sy in src_start_y..src_end_y {
+        for sy in src_y..src_end_y {
             let dy = dest_y + (sy - src_y);
-            if dy < 0 || dy >= self.height as _ {
+            if dy < 0 || dy >= self.height as i32 {
                 continue;
             }
 
-            for sx in src_start_x..src_end_x {
+            for sx in src_x..src_end_x {
                 let dx = dest_x + (sx - src_x);
-                if dx < 0 || dx >= self.width as _ {
+                if dx < 0 || dx >= self.width as i32 {
                     continue;
                 }
 
@@ -284,13 +286,22 @@ impl Buffer {
                     continue;
                 }
 
+                let dest_width = self.cells[dest_idx].width;
+
+                if dest_width == 0 && dx > 0 {
+                    self.cells[dest_idx - 1] = Cell::default();
+                }
+
+                if dest_width == 2 && cell.width == 1 && (dx + 1) < self.width as i32 {
+                    self.cells[dest_idx + 1] = Cell::default();
+                }
+
                 self.cells[dest_idx] = cell.clone();
 
-                if cell.width == 2 && (dx + 1) < (self.width as _) && (sx + 1) < (other.width as _)
+                if cell.width == 2 && (dx + 1) < self.width as i32 && (sx + 1) < other.width as i32
                 {
                     let src_next_idx = src_idx + 1;
                     let dest_next_idx = dest_idx + 1;
-
                     self.cells[dest_next_idx] = other.cells[src_next_idx].clone();
                 }
             }
