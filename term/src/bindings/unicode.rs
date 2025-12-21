@@ -27,7 +27,7 @@ impl Unicode {
         table
     }
 
-    pub fn unicode_words(text: &str, lua: &Lua) -> TableRef {
+    pub fn words(text: &str, lua: &Lua) -> TableRef {
         let words = text.unicode_words();
         let mut table = lua.create_table();
         {
