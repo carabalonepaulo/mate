@@ -10,9 +10,11 @@ return {
       last_tick = 0,
       interval = interval,
 
-      start = { id = 'timer:start', data = { uid = id } },
-      stop = { id = 'timer:stop', data = { uid = id } },
-      timeout = { id = 'timer:timeout', data = { uid = id } }
+      msg = {
+        start = { id = 'timer:start', data = { uid = id } },
+        stop = { id = 'timer:stop', data = { uid = id } },
+        timeout = { id = 'timer:timeout', data = { uid = id } }
+      }
     }
   end,
 
@@ -30,7 +32,7 @@ return {
       local now = msg.data.now
       if now - model.last_tick >= model.interval then
         model.last_tick = now
-        batch.push(model.timeout)
+        batch.push(model.msg.timeout)
       end
       return model, batch
     end

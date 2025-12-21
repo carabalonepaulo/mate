@@ -14,7 +14,7 @@ App {
       budget = 0,
       count = 0,
     }
-    return model, timer.start
+    return model, timer.msg.start
   end,
 
   update = function(model, msg, cmd)

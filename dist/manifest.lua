@@ -10,6 +10,7 @@ return {
     ["require 'ds.stack'"] = "require 'mate.ds.stack'",
     ["require 'components.log'"] = "require 'mate.components.log'",
     ["require 'components.indexed_view'"] = "require 'mate.components.indexed_view'",
+    ["require 'components.progress_bar'"] = "require 'mate.components.progress_bar'",
   },
   files = {
     { 'mate.ds.stack',                './src/ds/stack.lua' },
@@ -28,5 +29,6 @@ return {
     { 'mate.components.spinner',      './src/components/spinner.lua' },
     { 'mate.components.line_input',   './src/components/line_input.lua' },
     { 'mate.components.list',         './src/components/list.lua' },
+    { 'mate.components.progress_bar', './src/components/progress_bar.lua' },
   }
 }
