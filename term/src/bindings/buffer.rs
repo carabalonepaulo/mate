@@ -55,7 +55,15 @@ impl Default for Cell {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
+struct Clip {
+    x: u16,
+    y: u16,
+    w: u16,
+    h: u16,
+}
+
+#[derive(Debug)]
 pub struct Buffer {
     cells: Vec<Cell>,
     width: u16,
@@ -68,13 +76,30 @@ pub struct Buffer {
     clip_y: u16,
     clip_w: u16,
     clip_h: u16,
+    clip_stack: Vec<Clip>,
 
     style: Style,
     styles: Vec<Style>,
+
+    offset_stack: Vec<(i32, i32)>,
+    cur_offset_x: i32,
+    cur_offset_y: i32,
 }
 
 #[user_data]
 impl Buffer {
+    pub fn width(&self) -> i32 {
+        self.width as _
+    }
+
+    pub fn height(&self) -> i32 {
+        self.height as _
+    }
+
+    pub fn size(&self) -> (i32, i32) {
+        (self.width as _, self.height as _)
+    }
+
     pub fn resize(&mut self, width: i32, height: i32) {
         let width = width.max(0) as u16;
         let height = height.max(0) as u16;
@@ -108,20 +133,77 @@ impl Buffer {
         }
     }
 
-    pub fn set_clip(&mut self, x: i32, y: i32, w: i32, h: i32) {
-        self.clip_x = (x - 1).max(0) as u16;
-        self.clip_y = (y - 1).max(0) as u16;
-        self.clip_w = w.max(0) as u16;
-        self.clip_h = h.max(0) as u16;
+    pub fn with_clip(this: &mut StackUd<Buffer>, x: i32, y: i32, w: i32, h: i32, func: &StackFn) {
+        this.with_mut(|s| s.push_clip(x, y, w, h));
+        let result = func.call::<(), ()>(());
+        this.with_mut(|s| s.pop_clip());
+        result.unwrap_display();
     }
 
-    pub fn get_clip(&self) -> (i32, i32, i32, i32) {
-        (
-            (self.clip_x + 1) as i32,
-            (self.clip_y + 1) as i32,
-            self.clip_w as i32,
-            self.clip_h as i32,
-        )
+    pub fn push_clip(&mut self, x: i32, y: i32, w: i32, h: i32) {
+        let new = Clip {
+            x: (x + self.cur_offset_x).max(0) as u16,
+            y: (y + self.cur_offset_y).max(0) as u16,
+            w: w.max(0) as u16,
+            h: h.max(0) as u16,
+        };
+
+        let cur = Clip {
+            x: self.clip_x,
+            y: self.clip_y,
+            w: self.clip_w,
+            h: self.clip_h,
+        };
+
+        let ix1 = new.x.max(cur.x);
+        let iy1 = new.y.max(cur.y);
+
+        let ix2 = (new.x + new.w).min(cur.x + cur.w);
+        let iy2 = (new.y + new.h).min(cur.y + cur.h);
+
+        self.clip_stack.push(cur);
+
+        if ix2 > ix1 && iy2 > iy1 {
+            self.clip_x = ix1;
+            self.clip_y = iy1;
+            self.clip_w = ix2 - ix1;
+            self.clip_h = iy2 - iy1;
+        } else {
+            self.clip_w = 0;
+            self.clip_h = 0;
+        }
+    }
+
+    pub fn pop_clip(&mut self) {
+        if let Some(prev) = self.clip_stack.pop() {
+            self.clip_x = prev.x;
+            self.clip_y = prev.y;
+            self.clip_w = prev.w;
+            self.clip_h = prev.h;
+        }
+    }
+
+    pub fn with_offset(this: &mut StackUd<Buffer>, x: i32, y: i32, func: &StackFn) {
+        this.with_mut(|s| {
+            s.push_offset(x, y);
+            s.move_to(0, 0);
+        });
+        let result = func.call::<(), ()>(());
+        this.with_mut(|s| s.pop_offset());
+        result.unwrap_display();
+    }
+
+    pub fn push_offset(&mut self, x: i32, y: i32) {
+        self.offset_stack.push((x, y));
+        self.cur_offset_x += x;
+        self.cur_offset_y += y;
+    }
+
+    pub fn pop_offset(&mut self) {
+        if let Some((dx, dy)) = self.offset_stack.pop() {
+            self.cur_offset_x -= dx;
+            self.cur_offset_y -= dy;
+        }
     }
 
     pub fn set_fg(&mut self, color: Option<&StackValue>) -> Result<(), Error> {
@@ -160,16 +242,20 @@ impl Buffer {
     }
 
     pub fn move_to(&mut self, x: i32, y: i32) {
-        self.cx = ((x - 1).max(0) as u16).min(self.width.saturating_sub(1));
-        self.cy = ((y - 1).max(0) as u16).min(self.height.saturating_sub(1));
+        let abs_x = x + self.cur_offset_x;
+        let abs_y = y + self.cur_offset_y;
+
+        self.cx = (abs_x.max(0) as u16).min(self.width.saturating_sub(1));
+        self.cy = (abs_y.max(0) as u16).min(self.height.saturating_sub(1));
     }
 
     pub fn move_to_col(&mut self, x: i32) {
-        self.cx = ((x - 1).max(0) as u16).min(self.width.saturating_sub(1));
+        let abs_x = x + self.cur_offset_x;
+        self.cx = (abs_x.max(0) as u16).min(self.width.saturating_sub(1));
     }
 
     pub fn move_to_next_line(&mut self) {
-        self.cx = 0;
+        self.cx = (self.cur_offset_x.max(0) as u16).min(self.width.saturating_sub(1));
         self.cy = (self.cy + 1).min(self.height.saturating_sub(1));
     }
 
@@ -187,13 +273,14 @@ impl Buffer {
             let w = unicode_width::UnicodeWidthStr::width(g) as u16;
 
             if w == 0 {
-                if self.cx > 0 {
+                if self.cx > self.cur_offset_x as u16 {
                     let idx = (self.cy as usize * self.width as usize) + (self.cx as usize - 1);
-                    let target_idx = if self.cells[idx].width == 0 && self.cx > 1 {
-                        idx - 1
-                    } else {
-                        idx
-                    };
+                    let target_idx =
+                        if self.cells[idx].width == 0 && self.cx > (self.cur_offset_x as u16 + 1) {
+                            idx - 1
+                        } else {
+                            idx
+                        };
                     self.cells[target_idx].symbol.push_str(g);
                 }
                 continue;
@@ -202,6 +289,7 @@ impl Buffer {
             if self.cx + w > self.width {
                 self.move_to_next_line();
             }
+
             if self.cy >= self.height {
                 break;
             }
@@ -241,8 +329,7 @@ impl Buffer {
 
     pub fn write_at(&mut self, x: i32, y: i32, text: &str) {
         let (old_x, old_y) = (self.cx, self.cy);
-        self.cx = ((x - 1).max(0) as u16).min(self.width.saturating_sub(1));
-        self.cy = ((y - 1).max(0) as u16).min(self.height.saturating_sub(1));
+        self.move_to(x, y);
         self.write(text);
         (self.cx, self.cy) = (old_x, old_y);
     }
@@ -257,10 +344,11 @@ impl Buffer {
         dest_w: i32,
         dest_h: i32,
     ) {
-        let src_x = (src_x - 1).max(0);
-        let src_y = (src_y - 1).max(0);
-        let dest_x = (dest_x - 1).max(0);
-        let dest_y = (dest_y - 1).max(0);
+        let src_x = src_x.max(0);
+        let src_y = src_y.max(0);
+
+        let dest_x = dest_x + self.cur_offset_x;
+        let dest_y = dest_y + self.cur_offset_y;
 
         let src_end_x = (src_x + dest_w).min(other.width as i32);
         let src_end_y = (src_y + dest_h).min(other.height as i32);
@@ -281,17 +369,14 @@ impl Buffer {
                 let dest_idx = (dy as usize * self.width as usize) + dx as usize;
 
                 let cell = &other.cells[src_idx];
-
                 if cell.width == 0 {
                     continue;
                 }
 
                 let dest_width = self.cells[dest_idx].width;
-
                 if dest_width == 0 && dx > 0 {
                     self.cells[dest_idx - 1] = Cell::default();
                 }
-
                 if dest_width == 2 && cell.width == 1 && (dx + 1) < self.width as i32 {
                     self.cells[dest_idx + 1] = Cell::default();
                 }
@@ -319,12 +404,19 @@ fn new(width: i32, height: i32) -> Buffer {
         height,
         cx: 0,
         cy: 0,
+
         clip_x: 0,
         clip_y: 0,
         clip_w: width,
         clip_h: height,
+        clip_stack: vec![],
+
         style: Style::default(),
         styles: vec![],
+
+        offset_stack: vec![],
+        cur_offset_x: 0,
+        cur_offset_y: 0,
     }
 }
 

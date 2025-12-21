@@ -171,13 +171,11 @@ return function()
     local ih = bh - (pt + pb + (b_offset * 2))
 
     if content_fn and iw > 0 and ih > 0 then
-      local cx, cy, cw, ch = 0, 0, 0, 0
-      cx, cy, cw, ch = buf:get_clip()
-      buf:set_clip(ix, iy, iw, ih)
-
-      content_fn(ix, iy, iw, ih)
-
-      buf:set_clip(cx, cy, cw, ch)
+      buf:with_offset(ix, iy, function()
+        buf:with_clip(0, 0, iw, ih, function()
+          content_fn(0, 0, iw, ih)
+        end)
+      end)
     end
 
     buf:pop_style()

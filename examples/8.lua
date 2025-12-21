@@ -65,6 +65,8 @@ App {
   end,
 
   view = function(model, buf)
-    ProgressBar.view(model.progress, buf, 100)
+    buf:with_offset(1, 1, function()
+      ProgressBar.view(model.progress, buf, 100)
+    end)
   end
 }

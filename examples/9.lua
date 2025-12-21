@@ -21,6 +21,14 @@ App {
     model.box.draw(model.buf, model.box_layout, function(x, y, w, h)
     end)
 
-    buf:blit(model.buf, 1, 1, 2, 2, 10, 1)
+    buf:with_offset(2, 2, function()
+      buf:blit(model.buf, 0, 0, 0, 0, 10, 1)
+      buf:with_offset(2, 2, function()
+        buf:blit(model.buf, 0, 0, 0, 0, 10, 1)
+        buf:with_offset(2, 2, function()
+          buf:blit(model.buf, 0, 0, 0, 0, 10, 1)
+        end)
+      end)
+    end)
   end
 }

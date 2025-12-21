@@ -55,13 +55,13 @@ App {
   end,
 
   view = function(model, buf)
-    buf:move_to_col(2)
-    buf:set_fg('#758994')
-    buf:set_attr('italic')
-    buf:write('Press enter to display text...\n\n')
-    buf:reset_style()
+    buf:with_offset(1, 1, function()
+      buf:set_fg('#758994')
+      buf:set_attr('italic')
+      buf:write('Press enter to display text...\n\n')
+      buf:reset_style()
 
-    buf:move_to_col(2)
-    Text.view(model.text, buf)
+      Text.view(model.text, buf)
+    end)
   end
 }

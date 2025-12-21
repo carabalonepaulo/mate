@@ -188,10 +188,12 @@ return function()
     if content_fn and layout.iw > 0 and layout.ih > 0 then
       buf:set_fg(c.sfg)
       buf:set_attr(c.sattr)
-      local cx, cy, cw, ch = buf:get_clip()
-      buf:set_clip(layout.ix, layout.iy, layout.iw, layout.ih)
-      content_fn(layout.ix, layout.iy, layout.iw, layout.ih)
-      buf:set_clip(cx, cy, cw, ch)
+
+      buf:with_offset(layout.ix, layout.iy, function()
+        buf:with_clip(0, 0, layout.iw, layout.ih, function()
+          content_fn(layout.iw, layout.ih)
+        end)
+      end)
     end
 
     buf:pop_style()

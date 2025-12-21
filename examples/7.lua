@@ -63,13 +63,13 @@ local function layout(model, w, h)
   model.size[1] = h
 
   model.input_box
-      .at(2, 2)
+      .at(1, 1)
       .width(w - 2)
       .height(3)
   model.input_layout = model.input_box.resolve()
 
   model.list_box
-      .at(2, 5)
+      .at(1, 4)
       .width(w - 2)
       .height(h - 5)
   model.list_layout = model.list_box.resolve()
@@ -198,18 +198,16 @@ App {
   view = function(model, buf)
     if not model.ready then return end
 
-    model.input_box.draw(buf, model.input_layout, function(x, y, w, h)
-      buf:move_to(x, y)
+    model.input_box.draw(buf, model.input_layout, function()
       buf:set_attr('bold')
       buf:write('> ')
       buf:set_attr(nil)
       LineInput.view(model.input, buf)
     end)
 
-    model.list_box.draw(buf, model.list_layout, function(x, y, w, h)
+    model.list_box.draw(buf, model.list_layout, function(w, h)
       if model.found then
-        buf:move_to(x, y)
-        List.view(model.list, buf, x, y, w, h, function(idx, result)
+        List.view(model.list, buf, 0, 0, w, h, function(idx, result)
           for _, seg in ipairs(result.segments) do
             if seg.highlight then
               buf:set_fg('#a84c32')
@@ -221,7 +219,6 @@ App {
           end
         end)
       else
-        buf:move_to(x, y)
         buf:set_attr('italic')
         buf:write('No results found!')
         buf:set_attr(nil)

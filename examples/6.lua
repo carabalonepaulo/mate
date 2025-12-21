@@ -32,8 +32,16 @@ App {
   end,
 
   view = function(model, buf)
-    buf:write(fmt('Count: %d\n', model.count))
-    buf:write(fmt('Elapsed: %0.2fs\n', (time.now() - model.elapsed)))
-    buf:write(fmt('Budget: %0.2fs', model.budget))
+    -- buf:with_offset(5, 5, function()
+    --   buf:write(fmt('Count: %d\n', model.count))
+    --   buf:write(fmt('Elapsed: %0.2fs\n', (time.now() - model.elapsed)))
+    --   buf:write(fmt('Budget: %0.2fs', model.budget))
+    -- end)
+
+    buf:with_offset(1, 1, function()
+      buf:write(fmt('Count: %d\n', model.count))
+      buf:write(fmt('Elapsed: %0.2fs\n', (time.now() - model.elapsed)))
+      buf:write(fmt('Budget: %0.2fs', model.budget))
+    end)
   end
 }

@@ -5,10 +5,10 @@ local Batch = require 'mate.batch'
 local Spinner = require 'mate.components.spinner'
 
 local function select_scene(model, buf)
-  buf:move_to(2, 2)
+  buf:move_to(1, 1)
   buf:write(string.format('Size: %d/%d\n', model.size[1], model.size[2]))
 
-  buf:move_to_col(2)
+  buf:move_to_col(1)
   buf:write('Index: ')
   buf:set_fg('#e0ab48')
   buf:set_attr('italic')
@@ -20,7 +20,7 @@ local function select_scene(model, buf)
 
   for idx, item in ipairs(model.items) do
     local prefix = model.idx == idx and 'X' or ' '
-    buf:move_to_col(2)
+    buf:move_to_col(1)
     buf:write('[')
     buf:set_fg('#70de5d')
     buf:set_attr('italic')
@@ -57,7 +57,7 @@ local function select_scene(model, buf)
   }
 
   buf:move_to_next_line()
-  buf:move_to_col(2)
+  buf:move_to_col(1)
 
   for i, spinner in ipairs(model.spinners) do
     buf:set_fg(colors[i])
@@ -66,7 +66,7 @@ local function select_scene(model, buf)
     buf:write(' ')
   end
 
-  buf:move_to(2, model.size[2] - 1)
+  buf:move_to(1, model.size[2] - 1)
 end
 
 local function done_scene(model, buf)

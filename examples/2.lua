@@ -32,18 +32,18 @@ App {
 
   view = function(model, buf)
     if model.state == 'done' then
-      buf:move_to(2, 2)
+      buf:move_to(1, 1)
       buf:write('Selected: ' .. model.items[model.idx])
       return
     end
 
-    buf:move_to(2, 2)
+    buf:move_to(1, 1)
     buf:set_attr('bold')
     buf:write('Options:')
     buf:move_to_next_line()
 
     for i, item in ipairs(model.items) do
-      buf:move_to_col(2)
+      buf:move_to_col(1)
       buf:move_to_next_line()
 
       if model.idx == i then
