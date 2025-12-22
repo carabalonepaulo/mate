@@ -30,6 +30,9 @@ return {
         reset = { id = 'indexed_view:reset', data = { uid = id } },
         sync = function(len, height)
           return { id = 'indexed_view:sync', data = { uid = id, len = len, height = height } }
+        end,
+        scroll_to = function(idx)
+          return { id = 'indexed_view:scroll_to', data = { uid = id, index = idx } }
         end
       },
     }
@@ -40,13 +43,18 @@ return {
       model.len = msg.data.len
     elseif msg.id == 'indexed_view:set_height' and msg.data.uid == model.uid then
       model.height = msg.data.height
-    elseif msg.id == 'indexed_view:reset' and msg.data.uid then
+    elseif msg.id == 'indexed_view:reset' and msg.data.uid == model.uid then
       model.len = 0
       model.offset = 0
       model.user_scrolled = false
-    elseif msg.id == 'indexed_view:sync' and msg.data.uid then
+    elseif msg.id == 'indexed_view:sync' and msg.data.uid == model.uid then
       model.len = msg.data.len
       model.height = msg.data.height
+    elseif msg.id == 'indexed_view:scroll_to' and msg.data.uid == model.uid then
+      local max_offset = math.max(0, model.len - model.height)
+      model.user_scrolled = true
+      local target_offset = msg.data.index - math.floor(model.height / 2)
+      model.offset = clamp(target_offset, 0, max_offset)
     elseif input.pressed(msg, 'up') then
       model.offset = model.offset - 1
       model.user_scrolled = true

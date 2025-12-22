@@ -574,6 +574,9 @@ return {
         reset = { id = 'indexed_view:reset', data = { uid = id } },
         sync = function(len, height)
           return { id = 'indexed_view:sync', data = { uid = id, len = len, height = height } }
+        end,
+        scroll_to = function(idx)
+          return { id = 'indexed_view:scroll_to', data = { uid = id, index = idx } }
         end
       },
     }
@@ -584,13 +587,18 @@ return {
       model.len = msg.data.len
     elseif msg.id == 'indexed_view:set_height' and msg.data.uid == model.uid then
       model.height = msg.data.height
-    elseif msg.id == 'indexed_view:reset' and msg.data.uid then
+    elseif msg.id == 'indexed_view:reset' and msg.data.uid == model.uid then
       model.len = 0
       model.offset = 0
       model.user_scrolled = false
-    elseif msg.id == 'indexed_view:sync' and msg.data.uid then
+    elseif msg.id == 'indexed_view:sync' and msg.data.uid == model.uid then
       model.len = msg.data.len
       model.height = msg.data.height
+    elseif msg.id == 'indexed_view:scroll_to' and msg.data.uid == model.uid then
+      local max_offset = math.max(0, model.len - model.height)
+      model.user_scrolled = true
+      local target_offset = msg.data.index - math.floor(model.height / 2)
+      model.offset = clamp(target_offset, 0, max_offset)
     elseif input.pressed(msg, 'up') then
       model.offset = model.offset - 1
       model.user_scrolled = true
@@ -644,7 +652,7 @@ return {
       ready = false,
       size = { 0, 0 },
       view = view,
-      lines = CircularBuffer(cap)
+      lines = CircularBuffer(cap),
     }
   end,
 
@@ -652,7 +660,17 @@ return {
     model.view = IndexedView.update(model.view, msg)
 
     if msg.id == 'log:push' then
-      model.lines.push(msg.data)
+      local location, num, err = string.match(msg.data, '^(.*:)(%d+): (.*)$')
+      if location then
+        model.lines.push {
+          { text = location,      attr = 'dim' },
+          { text = tostring(num), fg = '#b37e49' },
+          { text = ': ',          attr = 'dim' },
+          { text = err },
+        }
+      else
+        model.lines.push { { text = msg.data } }
+      end
       model.view = IndexedView.update(model.view, model.view.msg.set_len(model.lines.length()))
     elseif msg.id == 'sys:ready' then
       model.size[0] = msg.data.width
@@ -666,10 +684,32 @@ return {
     elseif msg.id ~= 'sys:tick' then
       if msg.id == 'key' then
         if not (msg.data.code == 'up' or msg.data.code == 'down') then
-          model.lines.push(string.format('[key] %s', msg.data.string))
+          model.lines.push {
+            { text = '[' },
+            { text = 'key',          fg = '#9e624a' },
+            { text = ':' },
+            { text = msg.data.kind,  fg = '#968d89' },
+            { text = '] ' },
+            { text = msg.data.string },
+          }
         end
       else
-        model.lines.push(string.format('[%s]', msg.id))
+        local prefix, sufix = string.match(msg.id, '^(.*):(.*)$')
+        if prefix then
+          model.lines.push {
+            { text = '[' },
+            { text = prefix, fg = '#9e8c4a' },
+            { text = ':' },
+            { text = sufix,  fg = '#909e4a' },
+            { text = '] ' },
+          }
+        else
+          model.lines.push {
+            { text = '[' },
+            { text = msg.id, fg = '#9e8c4a' },
+            { text = '] ' },
+          }
+        end
       end
       model.view = IndexedView.update(model.view, model.view.msg.set_len(model.lines.length()))
     end
@@ -680,28 +720,20 @@ return {
   view = function(model, buf)
     if not model.ready then return end
 
-    IndexedView.view(model.view, 2, 2, function(x, y, idx)
+    IndexedView.view(model.view, 1, 1, function(x, y, idx)
       buf:move_to(x, y)
-
-      local line = model.lines.at(idx)
-      local location, num, err = string.match(line, '^(.*:)(%d+): (.*)$')
-      if location and num and err then
-        buf:set_attr('dim')
-        buf:write(location)
-        buf:reset_style()
-        buf:set_fg('#b37e49')
-        buf:write(num)
-        buf:reset_style()
-        buf:set_attr('dim')
-        buf:write(': ')
-        buf:reset_style()
-        buf:write(err)
-        buf:move_to_next_line()
-      else
-        buf:write(line)
-        buf:move_to_next_line()
+      for _, span in ipairs(model.lines.at(idx)) do
+        buf:set_fg(span.fg)
+        buf:set_bg(span.bg)
+        buf:set_attr(span.attr)
+        buf:write(span.text or 'ruim')
       end
+      buf:move_to_next_line()
     end)
+
+    buf:set_fg(nil)
+    buf:set_bg(nil)
+    buf:set_attr(nil)
   end,
 }
 
@@ -1452,6 +1484,107 @@ return {
 
     buf:write(model.char_right)
     buf:write(label)
+  end
+}
+
+end)()
+package.loaded["mate.components.list"] = (function()
+local IndexedView = require 'mate.components.indexed_view'
+local Batch = require 'mate.batch'
+local input = require 'mate.input'
+local uid = require 'mate.uid'
+
+return {
+  init = function()
+    local view = IndexedView.init()
+    local id = uid()
+
+    return {
+      uid = id,
+      items = {},
+      view = view,
+      size = { 0, 0 },
+      selected = 0,
+
+      msg = {
+        add = function(item)
+          return { id = 'list:append', data = { uid = id, item = item } }
+        end,
+        append = function(items)
+          return { id = 'list:append', data = { uid = id, items = items } }
+        end,
+        selected = function(idx)
+          return { id = 'list:selected', data = { uid = id, index = idx } }
+        end,
+        clear = { id = 'list:clear', data = { uid = id } },
+      }
+    }
+  end,
+
+  update = function(model, msg, cmd)
+    local batch = Batch()
+
+    model.view, cmd = IndexedView.update(model.view, msg)
+    batch.push(cmd)
+
+    if msg.id == 'sys:ready' or msg.id == 'sys:resize' then
+      model.size[1] = msg.data.width
+      model.size[2] = msg.data.height
+      model.view, cmd = IndexedView.update(model.view, model.view.msg.set_height(model.size[2] - 2))
+      batch.push(cmd)
+    elseif msg.id == 'list:add' and msg.data.uid == model.uid then
+      table.insert(model.items, msg.data.item)
+      model.view, cmd = IndexedView.update(model.view, model.view.msg.set_len(#model.items))
+      batch.push(cmd)
+      if model.selected == 0 then
+        model.selected = 1
+        batch.push(model.view.msg.scroll_to(1))
+      end
+    elseif msg.id == 'list:append' and msg.data.uid == model.uid then
+      for _, item in ipairs(msg.data.items) do
+        table.insert(model.items, item)
+      end
+      model.view, cmd = IndexedView.update(model.view, model.view.msg.set_len(#model.items))
+      batch.push(cmd)
+      if model.selected == 0 then
+        model.selected = 1
+        batch.push(model.view.msg.scroll_to(1))
+      end
+    elseif msg.id == 'list:clear' and msg.data.uid == model.uid then
+      model.items = {}
+      model.view, cmd = IndexedView.update(model.view, model.view.msg.set_len(0))
+      batch.push(cmd)
+    elseif input.pressed(msg, 'tab') then
+      model.selected = (model.selected % #model.items) + 1
+      model.view, cmd = IndexedView.update(model.view, model.view.msg.scroll_to(model.selected))
+      batch.push(cmd)
+    elseif input.pressed(msg, 'shift+tab') then
+      model.selected = ((model.selected - 2) % #model.items) + 1
+      model.view, cmd = IndexedView.update(model.view, model.view.msg.scroll_to(model.selected))
+      batch.push(cmd)
+    elseif input.pressed(msg, 'enter') then
+      if model.selected <= #model.items then
+        batch.push(model.msg.selected(model.selected))
+      end
+    end
+
+    return model, batch
+  end,
+
+  view = function(model, buf, fn)
+    if model.size[1] == 0 or model.size[2] == 0 then return end
+    IndexedView.view(model.view, 0, 0, function(x, y, idx)
+      buf:move_to(x, y)
+      -- if idx == model.selected then
+      -- buf:set_fg('#42f5a1')
+      fn(idx, model.items[idx], idx == model.selected)
+      buf:write(model.items[idx])
+      -- buf:set_fg(nil)
+      buf:reset_style()
+      -- else
+      -- buf:write(model.items[idx])
+      -- end
+    end)
   end
 }
 

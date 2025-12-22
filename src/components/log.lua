@@ -8,7 +8,7 @@ return {
       ready = false,
       size = { 0, 0 },
       view = view,
-      lines = CircularBuffer(cap)
+      lines = CircularBuffer(cap),
     }
   end,
 
@@ -16,7 +16,17 @@ return {
     model.view = IndexedView.update(model.view, msg)
 
     if msg.id == 'log:push' then
-      model.lines.push(msg.data)
+      local location, num, err = string.match(msg.data, '^(.*:)(%d+): (.*)$')
+      if location then
+        model.lines.push {
+          { text = location,      attr = 'dim' },
+          { text = tostring(num), fg = '#b37e49' },
+          { text = ': ',          attr = 'dim' },
+          { text = err },
+        }
+      else
+        model.lines.push { { text = msg.data } }
+      end
       model.view = IndexedView.update(model.view, model.view.msg.set_len(model.lines.length()))
     elseif msg.id == 'sys:ready' then
       model.size[0] = msg.data.width
@@ -30,10 +40,32 @@ return {
     elseif msg.id ~= 'sys:tick' then
       if msg.id == 'key' then
         if not (msg.data.code == 'up' or msg.data.code == 'down') then
-          model.lines.push(string.format('[key] %s', msg.data.string))
+          model.lines.push {
+            { text = '[' },
+            { text = 'key',          fg = '#9e624a' },
+            { text = ':' },
+            { text = msg.data.kind,  fg = '#968d89' },
+            { text = '] ' },
+            { text = msg.data.string },
+          }
         end
       else
-        model.lines.push(string.format('[%s]', msg.id))
+        local prefix, sufix = string.match(msg.id, '^(.*):(.*)$')
+        if prefix then
+          model.lines.push {
+            { text = '[' },
+            { text = prefix, fg = '#9e8c4a' },
+            { text = ':' },
+            { text = sufix,  fg = '#909e4a' },
+            { text = '] ' },
+          }
+        else
+          model.lines.push {
+            { text = '[' },
+            { text = msg.id, fg = '#9e8c4a' },
+            { text = '] ' },
+          }
+        end
       end
       model.view = IndexedView.update(model.view, model.view.msg.set_len(model.lines.length()))
     end
@@ -44,27 +76,19 @@ return {
   view = function(model, buf)
     if not model.ready then return end
 
-    IndexedView.view(model.view, 2, 2, function(x, y, idx)
+    IndexedView.view(model.view, 1, 1, function(x, y, idx)
       buf:move_to(x, y)
-
-      local line = model.lines.at(idx)
-      local location, num, err = string.match(line, '^(.*:)(%d+): (.*)$')
-      if location and num and err then
-        buf:set_attr('dim')
-        buf:write(location)
-        buf:reset_style()
-        buf:set_fg('#b37e49')
-        buf:write(num)
-        buf:reset_style()
-        buf:set_attr('dim')
-        buf:write(': ')
-        buf:reset_style()
-        buf:write(err)
-        buf:move_to_next_line()
-      else
-        buf:write(line)
-        buf:move_to_next_line()
+      for _, span in ipairs(model.lines.at(idx)) do
+        buf:set_fg(span.fg)
+        buf:set_bg(span.bg)
+        buf:set_attr(span.attr)
+        buf:write(span.text or 'ruim')
       end
+      buf:move_to_next_line()
     end)
+
+    buf:set_fg(nil)
+    buf:set_bg(nil)
+    buf:set_attr(nil)
   end,
 }
