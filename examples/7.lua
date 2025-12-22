@@ -1,6 +1,7 @@
 local App = require 'mate.app'
 local Batch = require 'mate.batch'
-local List = require 'mate.components.list'
+-- local List = require 'mate.components.list'
+local IndexedView = require 'mate.components.indexed_view'
 local Box = require 'mate.box'
 local LineInput = require 'mate.components.line_input'
 local input = require 'mate.input'
@@ -134,18 +135,18 @@ App {
         .padding(0, 1, 0, 1)
     batch.push(input.msg.enable)
 
-    local list = List.init()
+    local list = IndexedView.init()
     local list_box = Box()
         .border(true)
         .border_color('#303640')
         .padding(0, 1, 0, 1)
-    -- .border_chars('👨‍👩‍👧‍👦', '👨‍👩‍👧‍👦', '👨‍👩‍👧‍👦', '👨‍👩‍👧‍👦', '👨‍👩‍👧‍👦', '👨‍👩‍👧‍👦')
 
     local model = {
       ready = false,
       size = { 0, 0 },
       found = true,
       filter = '',
+      filtered = {},
 
       input = input,
       input_box = input_box,
@@ -165,29 +166,27 @@ App {
     model.input, cmd = LineInput.update(model.input, msg)
     batch.push(cmd)
 
-    model.list, cmd = List.update(model.list, msg)
+    model.list, cmd = IndexedView.update(model.list, msg)
     batch.push(cmd)
 
     if msg.id == 'sys:ready' then
       model.ready = true
       layout(model, msg.data.width, msg.data.height)
-      batch.push(model.list.msg.append(filter(model, model.filter)))
-      batch.push(model.list.msg.set_size(model.list_layout.iw, model.list_layout.ih))
+      model.filtered = filter(model, model.filter)
+      model.list.len = #model.filtered
+      model.list.height = model.list_layout.ih
     elseif msg.id == 'sys:resize' then
       layout(model, msg.data.width, msg.data.height)
-      batch.push(model.list.msg.set_size(model.list_layout.iw, model.list_layout.ih))
+      model.list.height = model.list_layout.ih
     elseif input.pressed(msg, 'ctrl+l') or input.pressed(msg, 'ctrl+backspace') or input.pressed(msg, 'ctrl+w') then
       batch.push(model.input.msg.clear)
     elseif msg.id == 'line_input:submit' and msg.data.uid == model.input.uid then
     elseif msg.id == 'line_input:text_changed' and msg.data.uid == model.input.uid then
-      local filtered = filter(model, msg.data.text)
-      batch.push(model.list.msg.clear)
-      if #filtered > 0 then
-        model.found = true
-        batch.push(model.list.msg.append(filtered))
-      else
-        model.found = false
-      end
+      model.filtered = filter(model, msg.data.text)
+      local len = #model.filtered
+      model.found = len > 0
+      model.list, cmd = IndexedView.update(model.list, model.list.msg.set_len(len))
+      batch.push(cmd)
     elseif input.pressed(msg, 'f10') then
       batch.push({ id = 'log:push', data = 'clear' })
     end
@@ -207,7 +206,10 @@ App {
 
     model.list_box.draw(buf, model.list_layout, function(w, h)
       if model.found then
-        List.view(model.list, buf, 0, 0, w, h, function(idx, result)
+        IndexedView.view(model.list, 0, 0, function(x, y, idx)
+          local result = model.filtered[idx]
+
+          buf:move_to(x, y)
           for _, seg in ipairs(result.segments) do
             if seg.highlight then
               buf:set_fg('#a84c32')

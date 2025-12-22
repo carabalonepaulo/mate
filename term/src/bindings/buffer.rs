@@ -232,9 +232,11 @@ impl Buffer {
     pub fn reset_style(&mut self) {
         self.style = Style::default();
     }
+
     pub fn push_style(&mut self) {
         self.styles.push(self.style.clone())
     }
+
     pub fn pop_style(&mut self) {
         if let Some(style) = self.styles.pop() {
             self.style = style;

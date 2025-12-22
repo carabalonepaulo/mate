@@ -27,8 +27,11 @@ return {
         set_height = function(h)
           return { id = 'indexed_view:set_height', data = { uid = id, height = h } }
         end,
-        reset = { id = 'indexed_view:reset', data = { uid = id } }
-      }
+        reset = { id = 'indexed_view:reset', data = { uid = id } },
+        sync = function(len, height)
+          return { id = 'indexed_view:sync', data = { uid = id, len = len, height = height } }
+        end
+      },
     }
   end,
 
@@ -41,6 +44,9 @@ return {
       model.len = 0
       model.offset = 0
       model.user_scrolled = false
+    elseif msg.id == 'indexed_view:sync' and msg.data.uid then
+      model.len = msg.data.len
+      model.height = msg.data.height
     elseif input.pressed(msg, 'up') then
       model.offset = model.offset - 1
       model.user_scrolled = true
@@ -56,7 +62,6 @@ return {
     end
 
     local max_offset = math.max(0, model.len - model.height)
-
     if model.len <= model.height then
       model.offset = 0
       model.user_scrolled = false

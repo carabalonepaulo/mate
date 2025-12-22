@@ -28,7 +28,6 @@ return {
     { 'mate.components.timer',        './src/components/timer.lua' },
     { 'mate.components.spinner',      './src/components/spinner.lua' },
     { 'mate.components.line_input',   './src/components/line_input.lua' },
-    { 'mate.components.list',         './src/components/list.lua' },
     { 'mate.components.progress_bar', './src/components/progress_bar.lua' },
   }
 }
