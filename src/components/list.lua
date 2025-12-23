@@ -82,17 +82,10 @@ return {
 
   view = function(model, buf, fn)
     if model.size[1] == 0 or model.size[2] == 0 then return end
-    IndexedView.view(model.view, 0, 0, function(x, y, idx)
-      buf:move_to(x, y)
-      -- if idx == model.selected then
-      -- buf:set_fg('#42f5a1')
+    IndexedView.view(model.view, buf, function(idx)
       fn(idx, model.items[idx], idx == model.selected)
       buf:write(model.items[idx])
-      -- buf:set_fg(nil)
       buf:reset_style()
-      -- else
-      -- buf:write(model.items[idx])
-      -- end
     end)
   end
 }

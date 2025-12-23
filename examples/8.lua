@@ -48,9 +48,7 @@ App {
     model.progress, cmd = ProgressBar.update(model.progress, msg)
     batch.push(cmd)
 
-    if input.pressed(msg, 'enter') then
-      model = model + 1
-    elseif msg.id == 'timer:timeout' and msg.data.uid == model.timer.uid then
+    if msg.id == 'timer:timeout' and msg.data.uid == model.timer.uid then
       model.value = model.value >= model.max and 0 or model.value + 1
       batch.push(model.progress.msg.set_value(model.value))
     elseif input.pressed(msg, 'ctrl+l') then

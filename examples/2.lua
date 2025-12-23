@@ -1,5 +1,4 @@
 local App = require 'mate.app'
-local Batch = require 'mate.batch'
 local input = require 'mate.input'
 
 App {
@@ -31,29 +30,30 @@ App {
   end,
 
   view = function(model, buf)
-    if model.state == 'done' then
-      buf:move_to(1, 1)
-      buf:write('Selected: ' .. model.items[model.idx])
-      return
-    end
-
-    buf:move_to(1, 1)
-    buf:set_attr('bold')
-    buf:write('Options:')
-    buf:move_to_next_line()
-
-    for i, item in ipairs(model.items) do
-      buf:move_to_col(1)
-      buf:move_to_next_line()
-
-      if model.idx == i then
-        buf:set_fg('#60e0a7')
-        buf:set_attr('italic')
-        buf:write('> ' .. item)
-        buf:reset_style()
-      else
-        buf:write('  ' .. item)
+    buf:with_offset(1, 1, function()
+      if model.state == 'done' then
+        buf:write('Selected: ' .. model.items[model.idx])
+        return
       end
-    end
+
+      buf:set_attr('bold')
+      buf:write('Options:')
+      buf:set_attr(nil)
+
+      buf:with_offset(1, 2, function()
+        for i, item in ipairs(model.items) do
+          if model.idx == i then
+            buf:set_fg('#60e0a7')
+            buf:set_attr('italic')
+            buf:write('> ' .. item)
+            buf:reset_style()
+          else
+            buf:move_to_col(2)
+            buf:write(item)
+          end
+          buf:move_to_next_line()
+        end
+      end)
+    end)
   end
 }

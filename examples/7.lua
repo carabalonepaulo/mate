@@ -1,6 +1,5 @@
 local App = require 'mate.app'
 local Batch = require 'mate.batch'
--- local List = require 'mate.components.list'
 local IndexedView = require 'mate.components.indexed_view'
 local Box = require 'mate.box'
 local LineInput = require 'mate.components.line_input'
@@ -206,10 +205,8 @@ App {
 
     model.list_box.draw(buf, model.list_layout, function(w, h)
       if model.found then
-        IndexedView.view(model.list, 0, 0, function(x, y, idx)
+        IndexedView.view(model.list, buf, function(idx)
           local result = model.filtered[idx]
-
-          buf:move_to(x, y)
           for _, seg in ipairs(result.segments) do
             if seg.highlight then
               buf:set_fg('#a84c32')

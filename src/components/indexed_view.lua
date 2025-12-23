@@ -85,13 +85,15 @@ return {
     return model
   end,
 
-  view = function(model, x, y, fn)
+  view = function(model, buf, fn)
     for i = 1, model.height do
       local item_idx = model.offset + i
       if item_idx > model.len then
         break
       end
-      fn(x, y + (i - 1), item_idx)
+      buf:with_offset(0, i - 1, function()
+        fn(item_idx)
+      end)
     end
   end,
 }

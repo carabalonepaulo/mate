@@ -19,7 +19,6 @@ return {
     { 'mate.ds.queue.unbounded',      './src/ds/queue/unbounded.lua' },
     { 'mate.ds.queue.bounded',        './src/ds/queue/bounded.lua' },
     { 'mate.input',                   './src/input.lua' },
-    { 'mate.style',                   './src/style.lua' },
     { 'mate.batch',                   './src/batch.lua' },
     { 'mate.uid',                     './src/uid.lua' },
     { 'mate.components.indexed_view', './src/components/indexed_view.lua' },

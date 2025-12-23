@@ -76,15 +76,13 @@ return {
   view = function(model, buf)
     if not model.ready then return end
 
-    IndexedView.view(model.view, 1, 1, function(x, y, idx)
-      buf:move_to(x, y)
+    IndexedView.view(model.view, buf, function(idx)
       for _, span in ipairs(model.lines.at(idx)) do
         buf:set_fg(span.fg)
         buf:set_bg(span.bg)
         buf:set_attr(span.attr)
-        buf:write(span.text or 'ruim')
+        buf:write(span.text)
       end
-      buf:move_to_next_line()
     end)
 
     buf:set_fg(nil)

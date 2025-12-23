@@ -1,7 +1,6 @@
 local App = require 'mate.app'
 local List = require 'mate.components.list'
 local Batch = require 'mate.batch'
-local input = require 'mate.input'
 
 App {
   init = function()

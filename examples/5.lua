@@ -1,14 +1,14 @@
 local App = require 'mate.app'
 local LineInput = require 'mate.components.line_input'
 local Batch = require 'mate.batch'
-local Style = require 'mate.style'
+local Box = require 'mate.box'
 
 App {
   init = function()
     local input = LineInput.init()
     input.placeholder = 'type anything'
 
-    local input_style = Style()
+    local input_box = Box()
         .bg('#5773a1')
         .border(true)
         .width(50)
@@ -18,7 +18,8 @@ App {
       text = '',
       input = input,
       size = { 0, 0 },
-      input_style = input_style,
+      input_box = input_box,
+      input_layout = input_box.resolve(),
     }
     return model, model.input.msg.enable
   end,
@@ -30,8 +31,12 @@ App {
     model.input, cmd = LineInput.update(model.input, msg)
     batch.push(cmd)
 
-    if msg.id == 'sys:ready' then
+    if msg.id == 'sys:ready' or msg.id == 'sys:resize' then
       model.size = { msg.data.width, msg.data.height }
+      local cx = model.size[1] / 2 - model.input_layout.total_w / 2
+      local cy = model.size[2] / 2 - model.input_layout.total_h / 2
+      model.input_box.at(cx, cy)
+      model.input_layout = model.input_box.resolve()
     end
 
     if msg.id == 'line_input:submit' and msg.data.uid == model.input.uid then
@@ -47,13 +52,10 @@ App {
 
   view = function(model, buf)
     if model.text == '' then
-      model.input_style
-          .center(unpack(model.size))
-          .draw(buf, function(x, y, w, h)
-            buf:move_to(x, y)
-            buf:write(' > ')
-            LineInput.view(model.input, buf)
-          end)
+      model.input_box.draw(buf, model.input_layout, function(w, h)
+        buf:write(' > ')
+        LineInput.view(model.input, buf)
+      end)
     else
       buf:move_to(2, 2)
       buf:write('Text: ')
