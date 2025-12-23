@@ -18,6 +18,7 @@ App {
       text = '',
       input = input,
       size = { 0, 0 },
+      input_position = { 0, 0 },
       input_box = input_box,
       input_layout = input_box.resolve(),
     }
@@ -35,7 +36,7 @@ App {
       model.size = { msg.data.width, msg.data.height }
       local cx = model.size[1] / 2 - model.input_layout.total_w / 2
       local cy = model.size[2] / 2 - model.input_layout.total_h / 2
-      model.input_box.at(cx, cy)
+      model.input_position = { cx, cy }
       model.input_layout = model.input_box.resolve()
     end
 
@@ -52,9 +53,11 @@ App {
 
   view = function(model, buf)
     if model.text == '' then
-      model.input_box.draw(buf, model.input_layout, function(w, h)
-        buf:write(' > ')
-        LineInput.view(model.input, buf)
+      buf:with_offset(model.input_position[1], model.input_position[2], function()
+        model.input_box.draw(buf, model.input_layout, function(w, h)
+          buf:write(' > ')
+          LineInput.view(model.input, buf)
+        end)
       end)
     else
       buf:move_to(2, 2)

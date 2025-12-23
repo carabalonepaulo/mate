@@ -4,7 +4,7 @@ local Box = require 'mate.box'
 
 App {
   init = function()
-    local box = Box().bg('#3498eb').width(10).height(1).at(1, 1)
+    local box = Box().bg('#3498eb').width(10).height(1)
 
     return {
       buf = Buffer.new(10, 1),

@@ -17,8 +17,6 @@ return function()
   local cfg = {
     w = 0,
     h = 0,
-    x = 0,
-    y = 0,
     pt = 0,
     pr = 0,
     pb = 0,
@@ -44,11 +42,6 @@ return function()
 
   self.height = function(h)
     cfg.h = h
-    return self
-  end
-
-  self.at = function(x, y)
-    cfg.x, cfg.y = x, y
     return self
   end
 
@@ -126,12 +119,12 @@ return function()
     return {
       total_w = bw + cfg.ml + cfg.mr,
       total_h = bh + cfg.mt + cfg.mb,
-      bx = cfg.x + cfg.ml,
-      by = cfg.y + cfg.mt,
+      bx = cfg.ml,
+      by = cfg.mt,
       bw = bw,
       bh = bh,
-      ix = cfg.x + cfg.ml + cfg.pl + b_wl,
-      iy = cfg.y + cfg.mt + cfg.pt + b_ht,
+      ix = cfg.ml + cfg.pl + b_wl,
+      iy = cfg.mt + cfg.pt + b_ht,
       iw = math.max(0, bw - (cfg.pl + cfg.pr + b_wl + b_wr)),
       ih = math.max(0, bh - (cfg.pt + cfg.pb + b_ht + b_hb)),
       b_ht = b_ht,

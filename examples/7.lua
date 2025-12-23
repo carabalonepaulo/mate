@@ -62,14 +62,14 @@ local function layout(model, w, h)
   model.size[0] = w
   model.size[1] = h
 
+  model.input_pos = { 1, 1 }
   model.input_box
-      .at(1, 1)
       .width(w - 2)
       .height(3)
   model.input_layout = model.input_box.resolve()
 
+  model.list_pos = { 1, 4 }
   model.list_box
-      .at(1, 4)
       .width(w - 2)
       .height(h - 5)
   model.list_layout = model.list_box.resolve()
@@ -147,10 +147,12 @@ App {
       filter = '',
       filtered = {},
 
+      input_pos = { 0, 0 },
       input = input,
       input_box = input_box,
       input_layout = nil,
 
+      list_pos = { 0, 0 },
       list = list,
       list_box = list_box,
       list_layout = nil,
@@ -196,32 +198,36 @@ App {
   view = function(model, buf)
     if not model.ready then return end
 
-    model.input_box.draw(buf, model.input_layout, function()
-      buf:set_attr('bold')
-      buf:write('> ')
-      buf:set_attr(nil)
-      LineInput.view(model.input, buf)
+    buf:with_offset(model.input_pos[1], model.input_pos[2], function()
+      model.input_box.draw(buf, model.input_layout, function()
+        buf:set_attr('bold')
+        buf:write('> ')
+        buf:set_attr(nil)
+        LineInput.view(model.input, buf)
+      end)
     end)
 
-    model.list_box.draw(buf, model.list_layout, function(w, h)
-      if model.found then
-        IndexedView.view(model.list, buf, function(idx)
-          local result = model.filtered[idx]
-          for _, seg in ipairs(result.segments) do
-            if seg.highlight then
-              buf:set_fg('#a84c32')
-              buf:write(seg.text)
-              buf:set_fg(nil)
-            else
-              buf:write(seg.text)
+    buf:with_offset(model.list_pos[1], model.list_pos[2], function()
+      model.list_box.draw(buf, model.list_layout, function(w, h)
+        if model.found then
+          IndexedView.view(model.list, buf, function(idx)
+            local result = model.filtered[idx]
+            for _, seg in ipairs(result.segments) do
+              if seg.highlight then
+                buf:set_fg('#a84c32')
+                buf:write(seg.text)
+                buf:set_fg(nil)
+              else
+                buf:write(seg.text)
+              end
             end
-          end
-        end)
-      else
-        buf:set_attr('italic')
-        buf:write('No results found!')
-        buf:set_attr(nil)
-      end
+          end)
+        else
+          buf:set_attr('italic')
+          buf:write('No results found!')
+          buf:set_attr(nil)
+        end
+      end)
     end)
   end
 }
